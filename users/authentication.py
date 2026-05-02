@@ -8,6 +8,7 @@ from django.middleware.csrf import CsrfViewMiddleware
 class CookieAuthentication(BaseAuthentication):
 
     def enforce_csrf(self, request):
+        
         csrf_middleware = CsrfViewMiddleware(lambda req: None)
         result = csrf_middleware.process_view(request, None, (), {})
         if result is not None:

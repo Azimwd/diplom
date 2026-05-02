@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 from celery.schedules import crontab
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -26,7 +26,26 @@ SECRET_KEY = 'django-insecure-x@wd(!r-nsm@fdqk_5x=v)#r_$4rvy-g)_$p8xho5(@$$2_50b
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    '71516fd2606e.ngrok-free.app',
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://71516fd2606e.ngrok-free.app",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://71516fd2606e.ngrok-free.app",
+    "http://127.0.0.1:8000",
+]
+
+CORS_EXPOSE_HEADERS = ["Set-Cookie"]
 
 #email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -49,6 +68,7 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "optional"
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 ROBOKASSA_LOGIN = "YurGid"
 ROBOKASSA_PASSWORD1 = "wnI6S7q7VYxHSg38xWxM"
@@ -63,6 +83,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -74,19 +95,53 @@ INSTALLED_APPS = [
     'chats',
     'subscriptions',
     'payments',
+    'telegram_bot',
+
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+
+    'corsheaders',
 ]
+
+SITE_ID = 1
+
+GOOGLE_OAUTH_CALLBACK_URL = 'http://localhost:8000/accounts/google/login/callback/'
+LOGIN_REDIRECT_URL = "http://localhost:5173/"
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'offline', "prompt": "select_account"},
+    }
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
+    'allauth.account.middleware.AccountMiddleware',
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'users.middleware.JWTResponseMiddleware',
 ]
 
 ROOT_URLCONF = 'Lawly.urls'
+
+CORS_ALLOW_CREDENTIALS = True
 
 TEMPLATES = [
     {
@@ -155,6 +210,9 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         # 'rest_framework.authentication.SessionAuthentication',
     ),
+    "DEFAULT_RENDERER_CLASSES": [
+        "utils.response.APIRenderer",
+    ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
@@ -175,7 +233,7 @@ SIMPLE_JWT = {
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru-ru'
 
 TIME_ZONE = 'UTC'
 
@@ -188,9 +246,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+TELEGRAM_BOT_TOKEN = "8678608807:AAG5K6Aekafg6lRextE2SGl_i9ZaOP3KQNA"

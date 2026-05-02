@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def custom_exception_handler(exc, context):
-    # Сначала стандартный DRF handler
+
     response = drf_exception_handler(exc, context)
 
     if response is not None:
@@ -51,7 +51,6 @@ def custom_exception_handler(exc, context):
             "message": message
         }, status=response.status_code)
 
-    # Для всех необработанных исключений
     logger.exception(exc)
     return Response({
         "statusCode": 500,

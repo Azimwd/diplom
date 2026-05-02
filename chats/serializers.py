@@ -7,9 +7,15 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'role', 'content', 'created_at']
 
 
-class ChatSessionSerializer(serializers.ModelSerializer):
+class ChatSessionDetailSerializer(serializers.ModelSerializer):
     messages = ChatMessageSerializer(many=True, read_only=True)
 
     class Meta:
         model = ChatSession
         fields = ['id', 'title', 'messages', 'created_at', 'updated_at']
+
+class ChatSessionListSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ChatSession
+        fields = ['id', 'title', 'created_at', 'updated_at']

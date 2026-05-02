@@ -112,15 +112,10 @@ class CreateSubscriptionInvoiceView(APIView):
         )
 
         response = Response({
-            "statusCode": 200,
-            "success": True,
-            "data": {
-                "invoice_id": payment.invoice_id,
-                "plan": plan,
-                "amount": payment.amount,
-                "message": "Подписку создана"
-            },
-            "message": "Успешный вход"
+            "invoice_id": payment.invoice_id,
+            "plan": plan,
+            "amount": payment.amount,
+            "message": "Подписку создана"
         }, status=status.HTTP_200_OK)
 
         return response

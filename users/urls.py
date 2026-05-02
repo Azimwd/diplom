@@ -8,7 +8,7 @@ urlpatterns = [
     path('registrations/', Registrations.as_view(), name='Registrations'),
     path('login/', LoginView.as_view(), name='LoginView'),
     path('logout/', LogoutView.as_view(), name='LogoutView'),
-
+    path('user-info/', UserInfoView.as_view(), name='user-info'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     path('request-reset-email/', RequestPasswordResetEmail.as_view(), name='request-reset-email'),
