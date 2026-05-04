@@ -13,6 +13,7 @@ urlpatterns = [
     path('payments/', include('payments.urls', namespace="payments")),
     path('accounts/', include('allauth.urls')),
     path('telegram-bot/', include('telegram_bot.urls')),
+    path('ai-documents/', include('ai_documents.urls')),
 ]
 
 if settings.DEBUG:

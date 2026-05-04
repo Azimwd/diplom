@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'subscriptions',
     'payments',
     'telegram_bot',
+    'ai_documents',
 
     'allauth',
     'allauth.account',

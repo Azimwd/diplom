@@ -10,10 +10,11 @@ from .serializers import ChatMessageSerializer, ChatSessionListSerializer
 from chats.pagination import ChatPagination
 from subscriptions.models import Subscription
 
+from django.http import StreamingHttpResponse
+from users.authentication import CookieAuthentication
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 
-# -----------------------------
 # Список сессий с пагинацией
-# -----------------------------
 class ChatSessionListView(ListAPIView):
     pagination_class = ChatPagination
     serializer_class = ChatSessionListSerializer
@@ -25,9 +26,7 @@ class ChatSessionListView(ListAPIView):
         ).order_by("-updated_at")
 
 
-# -----------------------------
 # Создание сессии
-# -----------------------------
 class ChatSessionCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -42,9 +41,7 @@ class ChatSessionCreateView(APIView):
         }, status=201)
 
 
-# -----------------------------
 # Детали сессии и управление
-# -----------------------------
 class ChatSessionDetailView(APIView):
     permission_classes = [IsAuthenticated]
     pagination_class = ChatPagination
@@ -102,59 +99,7 @@ class ChatSessionDetailView(APIView):
         return Response({"message": "Сессия удалена"}, status=204)
 
 
-# -----------------------------
-# Создание сообщения в сессии
-# -----------------------------
-# class ChatMessageView(APIView):
-#     permission_classes = [IsAuthenticated]
 
-#     def post(self, request, session_id):
-#         user = request.user
-
-#         active_sub = (
-#             Subscription.objects
-#             .filter(user=user, end_date__gt=now())
-#             .order_by("-end_date")
-#             .first()
-#         )
-#         if not active_sub:
-#             if user.freeRequest <= 0:
-#                 return Response({"message": "Нет доступных запросов"}, status=402)
-#             user.freeRequest -= 1
-#             user.save()
-
-#         session = ChatSession.objects.filter(id=session_id, user=user).first()
-#         if not session:
-#             return Response({"message": "Сессия не найдена"}, status=404)
-
-#         content = request.data.get("content")
-#         if not content:
-#             return Response({"message": "Не передан контент сообщения"}, status=400)
-
-#         ChatMessage.objects.create(session=session, role="user", content=content)
-
-#         try:
-#             response = requests.post(
-#                 "https://etha-hypercatalectic-rueben.ngrok-free.dev/ask",
-#                 json={"question": content},
-#             )
-#             response.raise_for_status()
-#             api_result = response.json()
-#             assistant_content = api_result.get("answer", "Нет ответа от API.")
-#         except requests.exceptions.RequestException as e:
-#             assistant_content = f"Ошибка запроса к внешнему API: {str(e)}"
-
-#         ChatMessage.objects.create(session=session, role="assistant", content=assistant_content)
-
-#         return Response({
-#             "assistant_message": assistant_content,
-#             "message": "Сообщение успешно создано"
-#         }, status=201)
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils.timezone import now
 
 class ChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
@@ -162,7 +107,6 @@ class ChatMessageView(APIView):
     def post(self, request, session_id):
         user = request.user
 
-        # проверка подписки / лимитов
         active_sub = (
             Subscription.objects
             .filter(user=user, end_date__gt=now())
@@ -208,10 +152,9 @@ class ChatMessageView(APIView):
             "message_id": message.id
         }, status=201)
 
-
-from django.http import StreamingHttpResponse
-import requests
-
+@api_view(["GET"])
+@authentication_classes([CookieAuthentication])
+@permission_classes([IsAuthenticated])
 def stream_chat_answer(request, session_id):
     user = request.user
 
