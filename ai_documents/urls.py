@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import AiDocumentChatView, DocumentsListView
+from .views import AiDocumentChatView
 
 app_name = "ai_documents"
 

@@ -9,10 +9,12 @@ from .models import ChatSession, ChatMessage
 from .serializers import ChatMessageSerializer, ChatSessionListSerializer
 from chats.pagination import ChatPagination
 from subscriptions.models import Subscription
+from subscriptions.services.usage_limits import consume_user_token
 
 from django.http import StreamingHttpResponse
 from users.authentication import CookieAuthentication
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.exceptions import AuthenticationFailed
+
 
 # Список сессий с пагинацией
 class ChatSessionListView(ListAPIView):
@@ -99,29 +101,15 @@ class ChatSessionDetailView(APIView):
         return Response({"message": "Сессия удалена"}, status=204)
 
 
-
-
 class ChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
         user = request.user
 
-        active_sub = (
-            Subscription.objects
-            .filter(user=user, end_date__gt=now())
-            .order_by("-end_date")
-            .first()
-        )
-
-        if not active_sub:
-            if user.freeRequest <= 0:
-                return Response(
-                    {"message": "Нет доступных запросов"},
-                    status=402
-                )
-            user.freeRequest -= 1
-            user.save()
+        limit_response = consume_user_token(user)
+        if limit_response:
+            return limit_response
 
         session = ChatSession.objects.filter(
             id=session_id,
@@ -135,6 +123,7 @@ class ChatMessageView(APIView):
             )
 
         content = request.data.get("content")
+
         if not content:
             return Response(
                 {"message": "Не передан контент сообщения"},
@@ -152,11 +141,25 @@ class ChatMessageView(APIView):
             "message_id": message.id
         }, status=201)
 
-@api_view(["GET"])
-@authentication_classes([CookieAuthentication])
-@permission_classes([IsAuthenticated])
 def stream_chat_answer(request, session_id):
-    user = request.user
+    auth = CookieAuthentication()
+
+    try:
+        user_auth_tuple = auth.authenticate(request)
+        if user_auth_tuple is None:
+            return StreamingHttpResponse(
+                "data: Не авторизован\n\n",
+                content_type="text/event-stream; charset=utf-8",
+                status=401
+            )
+        user, _ = user_auth_tuple
+        request.user = user
+    except AuthenticationFailed:
+        return StreamingHttpResponse(
+            "data: Не авторизован\n\n",
+            content_type="text/event-stream; charset=utf-8",
+            status=401
+        )
 
     session = ChatSession.objects.filter(
         id=session_id,
@@ -187,10 +190,9 @@ def stream_chat_answer(request, session_id):
         try:
             r = requests.post(
                 "https://etha-hypercatalectic-rueben.ngrok-free.dev/ask",
-                json={"question": last_user_message.content},
-                timeout=60
+                json={"question": last_user_message.content, "session_id": session.id},
+                timeout=120
             )
-
             r.raise_for_status()
 
             api_result = r.json()
@@ -210,7 +212,11 @@ def stream_chat_answer(request, session_id):
         except Exception as e:
             yield f"data: Ошибка: {str(e)}\n\n"
 
-    return StreamingHttpResponse(
+    response = StreamingHttpResponse(
         event_stream(),
         content_type="text/event-stream; charset=utf-8"
     )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+
+    return response

@@ -10,7 +10,7 @@ from chats.models import ChatSession, ChatMessage
 from .services.documents import DOCUMENT_TYPES, get_document, get_documents_list
 from .services.ai_detector import detect_document_type
 from .services.generator_client import send_to_generator
-
+from subscriptions.services.usage_limits import consume_user_token
 
 class AiDocumentChatView(APIView):
     permission_classes = [IsAuthenticated]
@@ -42,7 +42,7 @@ class AiDocumentChatView(APIView):
             return self.handle_select(session, template_name)
 
         if action == "generate":
-            return self.handle_generate(session, template_name, values)
+            return self.handle_generate(session, template_name, values, request.user)
 
         return Response(
             {
@@ -61,8 +61,6 @@ class AiDocumentChatView(APIView):
             content=content
         )
 
-    # 1. Пользователь пишет: "какие документы можно создать?"
-    # или "создай мне договор"
     def handle_ask(self, session, question):
         if not question:
             return Response(
@@ -70,11 +68,9 @@ class AiDocumentChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        self.save_message(session, "user", question)
 
         detected = detect_document_type(question)
 
-        # Если ИИ понял, что пользователь просит список документов
         if detected.get("intent") == "documents_list":
             payload = {
                 "type": "documents_list",
@@ -83,11 +79,8 @@ class AiDocumentChatView(APIView):
                 "next_step": "select_document"
             }
 
-            self.save_message(session, "assistant", payload)
-
             return Response(payload)
 
-        # Если ИИ определил конкретный документ
         if detected.get("found"):
             template_name = detected.get("template_name")
 
@@ -98,8 +91,6 @@ class AiDocumentChatView(APIView):
                     "documents": get_documents_list(),
                     "next_step": "select_document"
                 }
-
-                self.save_message(session, "assistant", payload)
 
                 return Response(payload)
 
@@ -114,8 +105,6 @@ class AiDocumentChatView(APIView):
                 "next_step": "generate_document"
             }
 
-            self.save_message(session, "assistant", payload)
-
             return Response(payload)
 
         # Если ИИ не понял документ
@@ -126,11 +115,8 @@ class AiDocumentChatView(APIView):
             "next_step": "select_document"
         }
 
-        self.save_message(session, "assistant", payload)
-
         return Response(payload)
 
-    # 2. Пользователь выбрал документ из списка
     def handle_select(self, session, template_name):
         if not template_name:
             return Response(
@@ -146,14 +132,6 @@ class AiDocumentChatView(APIView):
 
         document = get_document(template_name)
 
-        user_payload = {
-            "type": "document_selected",
-            "template_name": template_name,
-            "document_title": document["title"]
-        }
-
-        self.save_message(session, "user", user_payload)
-
         assistant_payload = {
             "type": "document_fields",
             "reply": f"Заполните поля для документа: {document['title']}",
@@ -167,9 +145,8 @@ class AiDocumentChatView(APIView):
 
         return Response(assistant_payload)
 
-    # 3. Пользователь отправляет template_name + values
-    # Django отправляет это в /generate и сохраняет ссылку в историю чата
-    def handle_generate(self, session, template_name, values):
+
+    def handle_generate(self, session, template_name, values, user):
         if not template_name:
             return Response(
                 {"detail": "Поле template_name обязательно."},
@@ -211,14 +188,9 @@ class AiDocumentChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user_payload = {
-            "type": "document_values",
-            "template_name": template_name,
-            "document_title": document["title"],
-            "values": values
-        }
-
-        self.save_message(session, "user", user_payload)
+        limit_response = consume_user_token(user)
+        if limit_response:
+            return limit_response
 
         generator_response = send_to_generator(
             template_name=template_name,
