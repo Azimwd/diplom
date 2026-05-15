@@ -27,7 +27,7 @@ def set_jwt_cookie(sender, request, user, **kwargs):
 
     request._jwt_access_token = access
     request._jwt_refresh_token = refresh_token
-    request._jwt_redirect_url = "http://localhost:5173/chat"
+    request._jwt_redirect_url = "http://localhost:4173/chat"
 @receiver(post_save, sender=Users)
 def create_user_related_data(sender, instance, created, **kwargs):
     if created:

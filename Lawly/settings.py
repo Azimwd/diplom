@@ -33,14 +33,14 @@ ALLOWED_HOSTS = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
     "https://71516fd2606e.ngrok-free.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
     "https://71516fd2606e.ngrok-free.app",
     "http://127.0.0.1:8000",
 ]
@@ -109,7 +109,7 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 GOOGLE_OAUTH_CALLBACK_URL = 'http://localhost:8000/accounts/google/login/callback/'
-LOGIN_REDIRECT_URL = "http://localhost:5173/"
+LOGIN_REDIRECT_URL = "http://localhost:4173/"
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
 AUTHENTICATION_BACKENDS = (

@@ -1,8 +1,10 @@
-from django.urls import path
-from .views import CreateTelegramLinkCodeView, TelegramWebhookView
+# telegram_bot/urls.py
 
-app_name = "telegram_bot"
+from django.urls import path
+from .views import TelegramWebhookView
+
+app_name = "telegram-bot"
+
 urlpatterns = [
-    path("link-code/", CreateTelegramLinkCodeView.as_view()),
     path("webhook/", TelegramWebhookView.as_view()),
 ]

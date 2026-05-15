@@ -12,4 +12,9 @@ urlpatterns = [
     path('sessions/<int:session_id>/messages/', ChatMessageView.as_view(), name='chat-messages'),
     path("sessions/<int:session_id>/stream/", stream_chat_answer),
     
+    path("sessions/<int:session_id>/attorney-price/", AttorneyPriceView.as_view()),
+
+    path("sessions/<int:session_id>/article-win-chance/", ArticleWinChanceView.as_view()),
+    
+    path("sessions/<int:session_id>/top-lawyers/", TopLawyersByArticleView.as_view(),name="top-lawyers-by-article"),
 ]

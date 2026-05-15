@@ -12,6 +12,8 @@ from .services.ai_detector import detect_document_type
 from .services.generator_client import send_to_generator
 from subscriptions.services.usage_limits import consume_user_token
 
+
+
 class AiDocumentChatView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -43,7 +45,7 @@ class AiDocumentChatView(APIView):
 
         if action == "generate":
             return self.handle_generate(session, template_name, values, request.user)
-
+    
         return Response(
             {
                 "detail": "Передайте action: ask, select или generate."

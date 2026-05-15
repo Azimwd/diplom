@@ -14,6 +14,7 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('telegram-bot/', include('telegram_bot.urls')),
     path('ai-documents/', include('ai_documents.urls')),
+    path('telegram_bot/', include('telegram_bot.urls')),
 ]
 
 if settings.DEBUG:
