@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
+
 class ChatSession(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="chat_sessions", on_delete=models.CASCADE)
     title = models.CharField(max_length=255, blank=True, null=True)

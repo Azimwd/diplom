@@ -15,6 +15,7 @@ urlpatterns = [
     path('telegram-bot/', include('telegram_bot.urls')),
     path('ai-documents/', include('ai_documents.urls')),
     path('telegram_bot/', include('telegram_bot.urls')),
+    path('ai_modules/', include('ai_modules.urls')),
 ]
 
 if settings.DEBUG:
