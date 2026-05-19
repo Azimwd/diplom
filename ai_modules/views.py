@@ -28,6 +28,7 @@ class AskView(APIView):
             )
 
         question = request.data.get("question", "").strip()
+        language = request.data.get("language", "ru")
 
         if not question:
             return Response(
@@ -50,7 +51,8 @@ class AskView(APIView):
                 "https://etha-hypercatalectic-rueben.ngrok-free.dev/ask",
                 json={
                     "question": question,
-                    "session_id": session.id
+                    "session_id": session.id,
+                    "language": language
                 },
                 timeout=120
             )
@@ -106,7 +108,7 @@ class AttorneyPriceView(APIView):
             )
 
         question = request.data.get("question", "").strip()
-
+        language = request.data.get("language", "ru")
         if not question:
             return Response(
                 {"error": "question обязателен"},
@@ -114,6 +116,7 @@ class AttorneyPriceView(APIView):
             )
 
         limit_response = consume_user_token(user)
+
         if limit_response:
             return limit_response
 
@@ -128,7 +131,8 @@ class AttorneyPriceView(APIView):
                 "https://etha-hypercatalectic-rueben.ngrok-free.dev/price",
                 json={
                     "question": question,
-                    "session_id": session.id
+                    "session_id": session.id,
+                    "language": language
                 },
                 timeout=120
             )
@@ -174,6 +178,7 @@ class ArticleWinChanceView(APIView):
             )
 
         question = request.data.get("question", "").strip()
+        language = request.data.get("language", "ru")
 
         if not question:
             return Response(
@@ -196,7 +201,8 @@ class ArticleWinChanceView(APIView):
                 "https://etha-hypercatalectic-rueben.ngrok-free.dev/article-win-chance",
                 json={
                     "question": question,
-                    "session_id": session.id
+                    "session_id": session.id,
+                    "language": language
                 },
                 timeout=120
             )
@@ -277,6 +283,7 @@ class TopLawyersByArticleView(APIView):
             )
 
         question = request.data.get("question", "").strip()
+        language = request.data.get("language", "ru")
         top_n = request.data.get("top_n", 5)
 
         if not question:
@@ -301,7 +308,8 @@ class TopLawyersByArticleView(APIView):
                 json={
                     "question": question,
                     "top_n": top_n,
-                    "session_id": session.id
+                    "session_id": session.id,
+                    "language": language
                 },
                 timeout=120
             )

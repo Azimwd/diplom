@@ -13,7 +13,6 @@ from .services.generator_client import send_to_generator
 from subscriptions.services.usage_limits import consume_user_token
 
 
-
 class AiDocumentChatView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -36,15 +35,22 @@ class AiDocumentChatView(APIView):
         question = request.data.get("question", "").strip()
         template_name = request.data.get("template_name")
         values = request.data.get("values")
+        language = request.data.get("language", "ru")
 
         if action == "ask":
-            return self.handle_ask(session, question)
+            return self.handle_ask(session, question, language)
 
         if action == "select":
             return self.handle_select(session, template_name)
 
         if action == "generate":
-            return self.handle_generate(session, template_name, values, request.user)
+            return self.handle_generate(
+                session,
+                template_name,
+                values,
+                request.user,
+                language
+            )
     
         return Response(
             {
@@ -63,7 +69,7 @@ class AiDocumentChatView(APIView):
             content=content
         )
 
-    def handle_ask(self, session, question):
+    def handle_ask(self, session, question, language):
         if not question:
             return Response(
                 {"detail": "Поле question обязательно."},
@@ -71,7 +77,10 @@ class AiDocumentChatView(APIView):
             )
 
 
-        detected = detect_document_type(question)
+        detected = detect_document_type(
+            question=question,
+            language=language
+        )
 
         if detected.get("intent") == "documents_list":
             payload = {
@@ -148,7 +157,7 @@ class AiDocumentChatView(APIView):
         return Response(assistant_payload)
 
 
-    def handle_generate(self, session, template_name, values, user):
+    def handle_generate(self, session, template_name, values, user, language):
         if not template_name:
             return Response(
                 {"detail": "Поле template_name обязательно."},
@@ -196,7 +205,8 @@ class AiDocumentChatView(APIView):
 
         generator_response = send_to_generator(
             template_name=template_name,
-            values=values
+            values=values,
+            language=language
         )
 
         if generator_response.get("error"):

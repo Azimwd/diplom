@@ -12,7 +12,6 @@ urlpatterns = [
     path('subscriptions/', include('subscriptions.urls', namespace="subscriptions")),
     path('payments/', include('payments.urls', namespace="payments")),
     path('accounts/', include('allauth.urls')),
-    path('telegram-bot/', include('telegram_bot.urls')),
     path('ai-documents/', include('ai_documents.urls')),
     path('telegram_bot/', include('telegram_bot.urls')),
     path('ai_modules/', include('ai_modules.urls')),

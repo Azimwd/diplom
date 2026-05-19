@@ -18,6 +18,8 @@ from ai_documents.services.generator_client import send_to_generator
 from subscriptions.services.usage_limits import consume_user_token
 from chats.models import ChatSession, ChatMessage
 
+def json_to_telegram_text(data):
+    return json.dumps(data, ensure_ascii=False, indent=2)
 
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -282,11 +284,15 @@ def handle_ai_question_from_telegram(tg_profile, question):
 
         data = r.json()
 
-        answer = data.get("answer") or "ИИ не вернул ответ."
+        telegram_answer = json_to_telegram_text(data)
 
-        ChatMessage.objects.create(session=session, role="assistant", content=answer)
+        ChatMessage.objects.create(
+            session=session,
+            role="assistant",
+            content=telegram_answer
+        )
 
-        return answer
+        return telegram_answer
 
     except Exception as e:
         traceback.print_exc()
@@ -329,14 +335,17 @@ def handle_price_question(tg_profile, question):
 
         data = r.json()
 
-        answer = data.get("answer", "Нет ответа от ИИ")
+        telegram_answer = json_to_telegram_text(data)
 
-        ChatMessage.objects.create(session=session, role="assistant", content=answer)
+        ChatMessage.objects.create(
+            session=session,
+            role="assistant",
+            content=telegram_answer
+        )
 
-        return answer
+        return telegram_answer
 
     except Exception as e:
-        print("PRICE ERROR:", e)
         return "Ошибка при расчёте стоимости дела."
 
 
@@ -362,27 +371,17 @@ def handle_win_chance_question(tg_profile, question):
 
         data = r.json()
 
-        answer = data.get("answer", "Нет ответа от ИИ")
-
-        stats = (
-            f"\n\n"
-            f"Статья: {data.get('article')}\n"
-            f"Всего дел: {data.get('total')}\n"
-            f"Побед: {data.get('wins')}\n"
-            f"Поражений: {data.get('losses')}\n"
-            f"Шанс победы: {data.get('win_rate')}%"
-        )
-
-        final_answer = answer + stats
+        telegram_answer = json_to_telegram_text(data)
 
         ChatMessage.objects.create(
-            session=session, role="assistant", content=final_answer
+            session=session,
+            role="assistant",
+            content=telegram_answer
         )
 
-        return final_answer
+        return telegram_answer
 
     except Exception as e:
-        print("WIN CHANCE ERROR:", e)
         return "Ошибка при анализе шансов."
 
 
@@ -417,19 +416,23 @@ def handle_telegram_document_select(tg_profile, document_query):
     tg_profile.current_template_name = found_template
     tg_profile.save(update_fields=["current_template_name", "updated_at"])
 
+    response_data = {
+        "type": "document_selected",
+        "template_name": found_template,
+        "title": document["title"],
+        "fields": document["fields"],
+        "message": "Документ выбран. Заполните поля и отправьте /generate JSON."
+    }
+
+    telegram_answer = json_to_telegram_text(response_data)
+
     ChatMessage.objects.create(
         session=session,
         role="assistant",
-        content=f"Выбран документ: {document['title']}",
+        content=telegram_answer
     )
 
-    return (
-        f"Выбран документ: {document['title']}\n\n"
-        f"Нужно заполнить поля:\n"
-        f"{fields_text}\n\n"
-        f"Теперь отправьте данные так:\n\n"
-        f'/generate {{"field_key": "значение"}}'
-    )
+    return telegram_answer
 
 
 def handle_telegram_document_generate(tg_profile, raw_json):
@@ -483,25 +486,19 @@ def handle_telegram_document_generate(tg_profile, raw_json):
         if generator_response.get("error"):
             return "Ошибка при создании документа."
 
-        response_data = generator_response.get("response", {})
 
-        file_url = (
-            response_data.get("file_url")
-            or response_data.get("download_url")
-            or response_data.get("url")
-        )
 
-        if not file_url:
-            return "Документ создан, но ссылка на файл не вернулась."
+        telegram_answer = json_to_telegram_text(generator_response)
 
         ChatMessage.objects.create(
-            session=session, role="assistant", content=f"Документ создан: {file_url}"
+            session=session,
+            role="assistant",
+            content=telegram_answer
         )
 
-        return f"Документ успешно создан:\n{file_url}"
-
+        return telegram_answer
+            
     except Exception as e:
-        print("DOCUMENT GENERATE ERROR:", e)
         return "Ошибка при создании документа."
 
 def handle_top_lawyers_question(tg_profile, question):
@@ -534,35 +531,15 @@ def handle_top_lawyers_question(tg_profile, question):
 
         data = r.json()
 
-        answer = data.get("answer", "Нет ответа от ИИ")
-
-        content_data = {
-            "type": "top_lawyers_by_article",
-            "intent": data.get("intent"),
-            "found": data.get("found"),
-            "answer": answer,
-
-            "article": data.get("article"),
-            "requested_article": data.get("requested_article"),
-            "total_lawyers": data.get("total_lawyers"),
-            "lawyers": data.get("lawyers", []),
-
-            "detector_source": data.get("detector_source"),
-            "confidence": data.get("confidence"),
-
-            "session_id": session.id,
-        }
-
-        content_json = json.dumps(content_data, ensure_ascii=False)
+        telegram_answer = json_to_telegram_text(data)
 
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=content_json
+            content=telegram_answer
         )
 
-        return answer
+        return telegram_answer
 
     except Exception as e:
-        print("TOP LAWYERS ERROR:", e)
         return "Ошибка при поиске топ адвокатов."
