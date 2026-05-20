@@ -41,6 +41,19 @@ class TelegramProfile(models.Model):
         blank=True
     )
 
+    registration_step = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True
+    )
+
+    pending_email = models.EmailField(
+        null=True,
+        blank=True
+    )
+
+    pending_password = models.CharField(max_length=255, null=True, blank=True)
+    
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
