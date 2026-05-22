@@ -22,8 +22,16 @@ def env_list(name, default=""):
 # =========================
 # MAIN SETTINGS
 # =========================
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-SECRET_KEY = os.environ["SECRET_KEY"]
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-local-dev-key-only"
+    else:
+        raise RuntimeError("SECRET_KEY environment variable is required")
+    
 DEBUG = env_bool("DEBUG", False)
 
 BACKEND_URL = os.getenv(

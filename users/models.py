@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.utils import timezone
+import uuid
+from datetime import timedelta
 
 class UsersManager(BaseUserManager):
     use_in_migrations = True
@@ -54,3 +57,37 @@ class RefreshTokenStorage(models.Model):
 
     def __str__(self):
         return f"{self.user.email} — {self.userAgent or 'unknown'}"
+    
+
+class RegistrationSession(models.Model):
+    session_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    first_name = models.CharField(max_length=150,default="Имя")
+    last_name = models.CharField(max_length=150,default="Фамилия")
+    email = models.EmailField()
+    role = models.CharField(max_length=15, choices=Users.ROLE_CHOICES)
+    password = models.CharField(max_length=128, null=True, blank=True)
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    last_email_sent_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.email} ({self.role})"
+
+
+class SocialOnboardingSession(models.Model):
+    session_id = models.UUIDField(default=uuid.uuid4, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    provider = models.CharField(max_length=30, default="google")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    @classmethod
+    def create(cls, user, provider="google", ttl_minutes=10):
+        return cls.objects.create(
+            user=user,
+            provider=provider,
+            expires_at=timezone.now() + timedelta(minutes=ttl_minutes),
+        )
+
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
