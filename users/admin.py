@@ -149,8 +149,6 @@ class RegistrationSessionAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "email",
-        "first_name",
-        "last_name",
         "role",
         "is_email_verified",
         "last_email_sent_at",
@@ -160,8 +158,6 @@ class RegistrationSessionAdmin(admin.ModelAdmin):
 
     search_fields = (
         "email",
-        "first_name",
-        "last_name",
         "session_id",
         "email_verification_token",
     )
