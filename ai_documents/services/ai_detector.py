@@ -6,7 +6,7 @@ from .documents import DOCUMENT_TYPES
 AI_DOCUMENT_DETECT_URL = "https://etha-hypercatalectic-rueben.ngrok-free.dev/documents/match-template"
 
 
-def detect_document_type(question: str):
+def detect_document_type(question: str, language: str = "ru"):
     documents = [
         {
             "template_name": template_name,
@@ -17,6 +17,7 @@ def detect_document_type(question: str):
 
     payload = {
         "question": question,
+        "language": language,
         "documents": documents,
         "expected_response": {
             "intent": "documents_list | document_generation | clarification | unknown",
@@ -25,7 +26,6 @@ def detect_document_type(question: str):
             "confidence": "number"
         }
     }
-
     try:
         response = requests.post(
             AI_DOCUMENT_DETECT_URL,

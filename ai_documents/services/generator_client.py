@@ -4,10 +4,11 @@ AI_GENERATOR_URL = "https://etha-hypercatalectic-rueben.ngrok-free.dev/generate"
 
 
     
-def send_to_generator(template_name, values):
+def send_to_generator(template_name, values, language = "ru"):
     payload = {
         "template_name": template_name,
-        "values": values
+        "values": values,
+        "language": language,
     }
 
     response = requests.post(
