@@ -44,10 +44,7 @@ FRONTEND_URL = os.getenv(
     "http://localhost:5173"
 ).rstrip("/")
 
-ALLOWED_HOSTS = env_list(
-    "ALLOWED_HOSTS",
-    "lawly.up.railway.app,localhost,127.0.0.1"
-)
+ALLOWED_HOSTS="https://lawly.up.railway.app,localhost,127.0.0.1"
 
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",

@@ -497,7 +497,7 @@ def google_callback_view(request):
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": "https://diplom-production-db9e.up.railway.app//accounts/google/login/callback/",
+        "redirect_uri": "https://lawly.up.railway.app/accounts/google/login/callback/",
         "grant_type": "authorization_code",
     }
     r = requests.post(token_url, data=data, timeout=15)
@@ -531,11 +531,11 @@ def google_callback_view(request):
     if created or not getattr(user, "role", None):
         s = SocialOnboardingSession.create(user=user, provider="google", ttl_minutes=10)
         return redirect(
-            f"https://diplom-production-db9e.up.railway.app/auth/choose-role?social_session={s.session_id}"
+            f"https://lawly.up.railway.app/auth/choose-role?social_session={s.session_id}"
         )
 
     refresh = RefreshToken.for_user(user)
-    response = redirect("https://www.yurgid.kz/")
+    response = redirect("http://localhost:5173")
 
     response.set_cookie(
         ACCESS_COOKIE_NAME,
@@ -746,7 +746,7 @@ class LogoutView(APIView):
             ):
                 google_logout_url = (
                     "https://accounts.google.com/Logout?continue="
-                    "https://appengine.google.com/_ah/logout?continue=https://www.yurgid.kz/"
+                    "https://appengine.google.com/_ah/logout?continue=http://localhost:5173"
                 )
                 redirect_response = redirect(google_logout_url)
                 clear_auth_cookies(redirect_response)
@@ -967,7 +967,7 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
             uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
             token = PasswordResetTokenGenerator().make_token(user)
             reset_url = (
-                f"https://www.yurgid.kz/auth/reset-password-confirm/{uidb64}/{token}/"
+                f"http://localhost:5173/auth/reset-password-confirm/{uidb64}/{token}/"
             )
 
             try:
