@@ -1,37 +1,12 @@
-# admin.py
-
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.utils.html import format_html
 
-from .models import Users, RefreshTokenStorage
-
-
-class RefreshTokenInline(admin.TabularInline):
-    model = RefreshTokenStorage
-    extra = 0
-
-    fields = (
-        "short_token",
-        "userAgent",
-        "created",
-    )
-
-    readonly_fields = (
-        "short_token",
-        "userAgent",
-        "created",
-    )
-
-    can_delete = True
-    show_change_link = True
-
-    def short_token(self, obj):
-        if len(obj.refreshToken) > 50:
-            return obj.refreshToken[:50] + "..."
-        return obj.refreshToken
-
-    short_token.short_description = "Refresh Token"
+from .models import (
+    Users,
+    RefreshTokenStorage,
+    RegistrationSession,
+    SocialOnboardingSession,
+)
 
 
 @admin.register(Users)
@@ -45,105 +20,88 @@ class UsersAdmin(UserAdmin):
         "freeRequest",
         "agreementAccepted",
         "privacyPolicyAccepted",
-        "is_staff",
         "is_active",
+        "is_staff",
+        "is_superuser",
         "createdAt",
+    )
+
+    list_display_links = ("id", "email")
+
+    search_fields = (
+        "email",
+        "first_name",
+        "last_name",
     )
 
     list_filter = (
         "role",
+        "is_active",
         "is_staff",
         "is_superuser",
-        "is_active",
         "agreementAccepted",
         "privacyPolicyAccepted",
         "createdAt",
     )
 
-    search_fields = (
-        "email",
-    )
-
-    ordering = (
-        "-createdAt",
-    )
+    ordering = ("-createdAt",)
 
     readonly_fields = (
         "createdAt",
         "last_login",
+        "date_joined",
     )
 
-    inlines = [RefreshTokenInline]
-
     fieldsets = (
-        (
-            "Основная информация",
-            {
-                "fields": (
-                    "email",
-                    "password",
-                )
-            }
-        ),
-        (
-            "Роль и лимиты",
-            {
-                "fields": (
-                    "role",
-                    "freeRequest",
-                )
-            }
-        ),
-        (
-            "Согласия",
-            {
-                "fields": (
-                    "agreementAccepted",
-                    "privacyPolicyAccepted",
-                    "agreementVersion",
-                )
-            }
-        ),
-        (
-            "Права доступа",
-            {
-                "fields": (
-                    "is_active",
-                    "is_staff",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                )
-            }
-        ),
-        (
-            "Системная информация",
-            {
-                "fields": (
-                    "last_login",
-                    "createdAt",
-                )
-            }
-        ),
+        ("Данные пользователя", {
+            "fields": (
+                "email",
+                "password",
+                "first_name",
+                "last_name",
+                "role",
+                "freeRequest",
+            )
+        }),
+        ("Согласия", {
+            "fields": (
+                "agreementAccepted",
+                "privacyPolicyAccepted",
+                "agreementVersion",
+            )
+        }),
+        ("Права доступа", {
+            "fields": (
+                "is_active",
+                "is_staff",
+                "is_superuser",
+                "groups",
+                "user_permissions",
+            )
+        }),
+        ("Важные даты", {
+            "fields": (
+                "last_login",
+                "date_joined",
+                "createdAt",
+            )
+        }),
     )
 
     add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                "fields": (
-                    "email",
-                    "password1",
-                    "password2",
-                    "role",
-                    "freeRequest",
-                    "is_staff",
-                    "is_superuser",
-                    "is_active",
-                ),
-            },
-        ),
+        ("Создание пользователя", {
+            "classes": ("wide",),
+            "fields": (
+                "email",
+                "password1",
+                "password2",
+                "role",
+                "freeRequest",
+                "is_active",
+                "is_staff",
+                "is_superuser",
+            ),
+        }),
     )
 
 
@@ -153,78 +111,110 @@ class RefreshTokenStorageAdmin(admin.ModelAdmin):
         "id",
         "user",
         "short_token",
-        "short_user_agent",
+        "userAgent",
         "created",
     )
+
+    list_display_links = ("id", "user")
 
     search_fields = (
         "user__email",
+        "refreshToken",
         "userAgent",
     )
 
-    readonly_fields = (
+    list_filter = (
         "created",
-        "formatted_token",
     )
 
-    ordering = (
-        "-created",
-    )
-
-    list_select_related = (
+    readonly_fields = (
         "user",
+        "refreshToken",
+        "userAgent",
+        "created",
     )
 
-    fieldsets = (
-        (
-            "Пользователь",
-            {
-                "fields": (
-                    "user",
-                )
-            }
-        ),
-        (
-            "Refresh token",
-            {
-                "fields": (
-                    "formatted_token",
-                    "userAgent",
-                )
-            }
-        ),
-        (
-            "Системная информация",
-            {
-                "fields": (
-                    "created",
-                )
-            }
-        ),
-    )
+    ordering = ("-created",)
 
     def short_token(self, obj):
-        if len(obj.refreshToken) > 40:
-            return obj.refreshToken[:40] + "..."
-        return obj.refreshToken
-
-    short_token.short_description = "Token"
-
-    def short_user_agent(self, obj):
-        if not obj.userAgent:
+        if not obj.refreshToken:
             return "-"
+        return obj.refreshToken[:25] + "..."
 
-        if len(obj.userAgent) > 60:
-            return obj.userAgent[:60] + "..."
+    short_token.short_description = "Refresh token"
 
-        return obj.userAgent
 
-    short_user_agent.short_description = "User-Agent"
+@admin.register(RegistrationSession)
+class RegistrationSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "email",
+        "first_name",
+        "last_name",
+        "role",
+        "is_email_verified",
+        "last_email_sent_at",
+    )
 
-    def formatted_token(self, obj):
-        return format_html(
-            "<div style='max-width:900px; word-break:break-all;'>{}</div>",
-            obj.refreshToken
-        )
+    list_display_links = ("id", "email")
 
-    formatted_token.short_description = "Полный token"
+    search_fields = (
+        "email",
+        "first_name",
+        "last_name",
+        "session_id",
+        "email_verification_token",
+    )
+
+    list_filter = (
+        "role",
+        "is_email_verified",
+        "last_email_sent_at",
+    )
+
+    readonly_fields = (
+        "session_id",
+        "email_verification_token",
+    )
+
+    ordering = ("-id",)
+
+
+@admin.register(SocialOnboardingSession)
+class SocialOnboardingSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "provider",
+        "session_id",
+        "created_at",
+        "expires_at",
+        "is_expired_display",
+    )
+
+    list_display_links = ("id", "user")
+
+    search_fields = (
+        "user__email",
+        "provider",
+        "session_id",
+    )
+
+    list_filter = (
+        "provider",
+        "created_at",
+        "expires_at",
+    )
+
+    readonly_fields = (
+        "session_id",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    def is_expired_display(self, obj):
+        return obj.is_expired()
+
+    is_expired_display.boolean = True
+    is_expired_display.short_description = "Истёк"

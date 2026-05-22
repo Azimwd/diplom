@@ -61,8 +61,6 @@ class RefreshTokenStorage(models.Model):
 
 class RegistrationSession(models.Model):
     session_id = models.UUIDField(default=uuid.uuid4, unique=True)
-    first_name = models.CharField(max_length=150,default="Имя")
-    last_name = models.CharField(max_length=150,default="Фамилия")
     email = models.EmailField()
     role = models.CharField(max_length=15, choices=Users.ROLE_CHOICES)
     password = models.CharField(max_length=128, null=True, blank=True)
