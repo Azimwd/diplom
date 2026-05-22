@@ -36,7 +36,7 @@ DEBUG = env_bool("DEBUG", False)
 
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
-    "https://diplom-production-db9e.up.railway.app"
+    "https://lawly.up.railway.app"
 ).rstrip("/")
 
 FRONTEND_URL = os.getenv(
@@ -46,7 +46,7 @@ FRONTEND_URL = os.getenv(
 
 ALLOWED_HOSTS = env_list(
     "ALLOWED_HOSTS",
-    "diplom-production-db9e.up.railway.app,localhost,127.0.0.1"
+    "lawly.up.railway.app,localhost,127.0.0.1"
 )
 
 CSRF_TRUSTED_ORIGINS = env_list(
