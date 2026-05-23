@@ -22,12 +22,6 @@ from django.contrib.auth import authenticate
 def json_to_telegram_text(data):
     return json.dumps(data, ensure_ascii=False, indent=2)
 
-def send_telegram_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-
-    response = requests.post(
-        url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -113,90 +107,50 @@ class TelegramWebhookView(APIView):
 
         if text == "/start":
             if tg_profile.user:
-                send_telegram_message(
-                    chat_id,
-                    "Здравствуйте. Ваш Telegram уже привязан к аккаунту сайта.\n\n"
-                    "/help — список команд"
-                )
                 return JsonResponse({"ok": True})
 
-            send_telegram_message(
-                chat_id,
-                "Здравствуйте.\n\n"
-                "Выберите действие:\n"
-                "/login — войти в существующий аккаунт сайта\n"
-                "/register — создать новый аккаунт"
-            )
             return JsonResponse({"ok": True})
         
         if text == "/login":
             tg_profile.registration_step = "login_email"
             tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-            send_telegram_message(
-                chat_id,
-                "Введите email от аккаунта сайта."
-            )
             return JsonResponse({"ok": True})
         
         if text == "/register":
             tg_profile.registration_step = "register_email"
             tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-            send_telegram_message(
-                chat_id,
-                "Введите email для регистрации нового аккаунта."
-            )
+
             return JsonResponse({"ok": True})
         
         if tg_profile.registration_step == "register_email":
             email = text.lower().strip()
 
             if Users.objects.filter(email=email).exists():
-                send_telegram_message(
-                    chat_id,
-                    "Аккаунт с такой почтой уже существует. Напишите /login, чтобы войти."
-                )
                 return JsonResponse({"ok": True})
 
             tg_profile.pending_email = email
             tg_profile.registration_step = "register_password"
             tg_profile.save(update_fields=["pending_email", "registration_step", "updated_at"])
 
-            send_telegram_message(
-                chat_id,
-                "Теперь придумайте пароль для аккаунта."
-            )
             return JsonResponse({"ok": True})
         
         if tg_profile.registration_step == "register_password":
             password = text.strip()
 
             if len(password) < 8:
-                send_telegram_message(
-                    chat_id,
-                    "Пароль должен быть не меньше 8 символов."
-                )
                 return JsonResponse({"ok": True})
 
             tg_profile.pending_password = password
             tg_profile.registration_step = "register_password_confirm"
             tg_profile.save(update_fields=["pending_password", "registration_step", "updated_at"])
 
-            send_telegram_message(
-                chat_id,
-                "Повторите пароль."
-            )
             return JsonResponse({"ok": True})
         if tg_profile.registration_step == "register_password_confirm":
             password_confirm = text.strip()
 
             if tg_profile.pending_password != password_confirm:
-                send_telegram_message(
-                    chat_id,
-                    "Пароли не совпадают. Введите пароль заново."
-                )
-
                 tg_profile.pending_password = None
                 tg_profile.registration_step = "register_password"
                 tg_profile.save(update_fields=["pending_password", "registration_step", "updated_at"])
@@ -229,11 +183,6 @@ class TelegramWebhookView(APIView):
                 ]
             )
 
-            send_telegram_message(
-                chat_id,
-                "Аккаунт создан. Telegram успешно привязан к новому аккаунту."
-            )
-
             return JsonResponse({"ok": True})
         if tg_profile.registration_step == "login_email":
             email = text.lower().strip()
@@ -241,29 +190,16 @@ class TelegramWebhookView(APIView):
             user = Users.objects.filter(email=email).first()
 
             if not user:
-                send_telegram_message(
-                    chat_id,
-                    "Аккаунт с такой почтой не найден. Сначала зарегистрируйтесь на сайте."
-                )
                 return JsonResponse({"ok": True})
 
             existing_tg = TelegramProfile.objects.filter(user=user).exclude(id=tg_profile.id).first()
 
             if existing_tg:
-                send_telegram_message(
-                    chat_id,
-                    "Этот аккаунт сайта уже привязан к другому Telegram."
-                )
                 return JsonResponse({"ok": True})
 
             tg_profile.pending_email = email
             tg_profile.registration_step = "login_password"
             tg_profile.save(update_fields=["pending_email", "registration_step", "updated_at"])
-
-            send_telegram_message(
-                chat_id,
-                "Теперь отправьте пароль от аккаунта сайта."
-            )
 
             return JsonResponse({"ok": True})
         
@@ -275,10 +211,6 @@ class TelegramWebhookView(APIView):
                 tg_profile.registration_step = "login_email"
                 tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-                send_telegram_message(
-                    chat_id,
-                    "Сначала отправьте email."
-                )
                 return JsonResponse({"ok": True})
 
             user = authenticate(
@@ -288,19 +220,13 @@ class TelegramWebhookView(APIView):
             )
 
             if not user:
-                send_telegram_message(
-                    chat_id,
-                    "Неверный email или пароль. Попробуйте ещё раз."
-                )
+
                 return JsonResponse({"ok": True})
 
             existing_tg = TelegramProfile.objects.filter(user=user).exclude(id=tg_profile.id).first()
 
             if existing_tg:
-                send_telegram_message(
-                    chat_id,
-                    "Этот аккаунт сайта уже привязан к другому Telegram."
-                )
+
                 return JsonResponse({"ok": True})
 
             tg_profile.user = user
@@ -320,44 +246,15 @@ class TelegramWebhookView(APIView):
                 ]
             )
 
-            send_telegram_message(
-                chat_id,
-                "Telegram успешно привязан к аккаунту сайта."
-            )
-
             return JsonResponse({"ok": True})
 
         if not tg_profile.user:
-            send_telegram_message(
-                chat_id,
-                "Сначала привяжите Telegram к аккаунту сайта. Напишите /start и отправьте email."
-            )
             return JsonResponse({"ok": True})
                 
         if text == "/help":
-            send_telegram_message(
-                chat_id,
-                "Команды:\n\n"
-                "/ask текст — обычный ИИ\n"
-                "/price текст — стоимость дела\n"
-                "/winchance текст — шанс победы\n"
-                "/toplawyers текст — топ адвокатов по статье\n"
-                "/docs — список документов\n"
-                "/doc название — выбрать документ\n"
-                "/generate JSON — создать документ\n"
-                "/new — новая сессия\n",
-            )
             return JsonResponse({"ok": True})
 
         if text == "/profile":
-            send_telegram_message(
-                chat_id,
-                (
-                    f"Ваш Telegram ID: {telegram_id}\n" f"Username: @{username}"
-                    if username
-                    else f"Ваш Telegram ID: {telegram_id}"
-                ),
-            )
             return JsonResponse({"ok": True})
 
         if text == "/new":
@@ -368,31 +265,24 @@ class TelegramWebhookView(APIView):
             tg_profile.current_session = session
             tg_profile.save(update_fields=["current_session", "updated_at"])
 
-            send_telegram_message(
-                chat_id, "Создана новая сессия. Теперь можете задать новый вопрос."
-            )
             return JsonResponse({"ok": True})
 
         if text.startswith("/ask "):
             question = text.replace("/ask ", "", 1).strip()
 
             if not question:
-                send_telegram_message(chat_id, "Напишите вопрос после команды /ask")
                 return JsonResponse({"ok": True})
 
             answer = handle_ai_question_from_telegram(
                 tg_profile=tg_profile, question=question
             )
 
-            send_telegram_message(chat_id, answer)
             return JsonResponse({"ok": True})
 
         if text.startswith("/price "):
             question = text.replace("/price ", "", 1).strip()
 
             answer = handle_price_question(tg_profile=tg_profile, question=question)
-
-            send_telegram_message(chat_id, answer)
 
             return JsonResponse({"ok": True})
 
@@ -403,14 +293,11 @@ class TelegramWebhookView(APIView):
                 tg_profile=tg_profile, question=question
             )
 
-            send_telegram_message(chat_id, answer)
-
             return JsonResponse({"ok": True})
         if text.startswith("/toplawyers "):
             question = text.replace("/toplawyers ", "", 1).strip()
 
             if not question:
-                send_telegram_message(chat_id, "Напишите вопрос после команды /toplawyers")
                 return JsonResponse({"ok": True})
 
             answer = handle_top_lawyers_question(
@@ -418,7 +305,6 @@ class TelegramWebhookView(APIView):
                 question=question
             )
 
-            send_telegram_message(chat_id, answer)
             return JsonResponse({"ok": True})
         if text == "/docs":
             documents = get_documents_list()
@@ -430,7 +316,6 @@ class TelegramWebhookView(APIView):
 
             message += "\nЧтобы выбрать документ, напишите:\n/doc название документа"
 
-            send_telegram_message(chat_id, message)
             return JsonResponse({"ok": True})
 
         if text.startswith("/doc "):
@@ -440,7 +325,6 @@ class TelegramWebhookView(APIView):
                 tg_profile=tg_profile, document_query=document_query
             )
 
-            send_telegram_message(chat_id, answer)
             return JsonResponse({"ok": True})
 
         if text.startswith("/generate "):
@@ -450,13 +334,7 @@ class TelegramWebhookView(APIView):
                 tg_profile=tg_profile, raw_json=raw_json
             )
 
-            send_telegram_message(chat_id, answer)
             return JsonResponse({"ok": True})
-
-        send_telegram_message(
-            chat_id,
-            "Я вас понял. Чтобы задать вопрос ИИ, напишите:\n\n" "/ask ваш вопрос",
-        )
 
         return JsonResponse({"ok": True})
 
