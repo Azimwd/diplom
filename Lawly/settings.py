@@ -3,9 +3,10 @@ from datetime import timedelta
 from celery.schedules import crontab
 import os
 import dj_database_url
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / ".env")
 
 def env_bool(name, default=False):
     value = os.getenv(name)
@@ -154,14 +155,18 @@ WSGI_APPLICATION = "Lawly.wsgi.application"
 # DATABASE
 # =========================
 
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+DATABASE_SSL_REQUIRE = env_bool("DATABASE_SSL_REQUIRE", not DEBUG)
+
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
+        default=DATABASE_URL,
         conn_max_age=600,
-        ssl_require=True,
+        ssl_require=DATABASE_SSL_REQUIRE,
     )
 }
-
 
 # =========================
 # USER / AUTH
