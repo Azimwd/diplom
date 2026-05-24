@@ -321,12 +321,22 @@ class TelegramWebhookView(APIView):
                 "message": "Новая Telegram-сессия создана."
             })
         
-        if not question:
-            return JsonResponse({
-                "ok": False,
-                "error": "empty_question",
-                "message": "После /ask нужно написать вопрос."
-            })
+        if text.startswith("/ask "):
+            question = text.replace("/ask ", "", 1).strip()
+
+            if not question:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_question",
+                    "message": "После /ask нужно написать вопрос."
+                })
+
+            answer = handle_ai_question_from_telegram(
+                tg_profile=tg_profile,
+                question=question
+            )
+
+            return JsonResponse(answer, safe=False)
 
         if text.startswith("/price "):
             question = text.replace("/price ", "", 1).strip()
