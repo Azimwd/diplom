@@ -274,10 +274,11 @@ class TelegramWebhookView(APIView):
                 return JsonResponse({"ok": True})
 
             answer = handle_ai_question_from_telegram(
-                tg_profile=tg_profile, question=question
+                tg_profile=tg_profile,
+                question=question
             )
 
-            return JsonResponse(answer)
+            return JsonResponse(answer, safe=False)
 
         if text.startswith("/price "):
             question = text.replace("/price ", "", 1).strip()
@@ -349,14 +350,26 @@ def handle_ai_question_from_telegram(tg_profile, question):
 
         user = tg_profile.user
 
-        limit_response = consume_user_token(user)
+        if user:
+            limit_response = consume_user_token(user)
 
-        if limit_response:
-            return "У вас закончились бесплатные запросы."
+            if limit_response:
+                return {
+                    "ok": False,
+                    "error": "limit_exceeded",
+                    "message": "У вас закончились бесплатные запросы."
+                }
 
-        ChatMessage.objects.create(session=session, role="user", content=question)
+        ChatMessage.objects.create(
+            session=session,
+            role="user",
+            content=question
+        )
 
-        payload = {"question": question, "session_id": session.id}
+        payload = {
+            "question": question,
+            "session_id": session.id
+        }
 
         r = requests.post(
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/ask",
@@ -368,20 +381,22 @@ def handle_ai_question_from_telegram(tg_profile, question):
 
         data = r.json()
 
-        telegram_answer = json_to_telegram_text(data)
-
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=telegram_answer
+            content=json.dumps(data, ensure_ascii=False)
         )
 
-        return telegram_answer
+        return data
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
 
-        return "Ошибка при обращении к ИИ."
+        return {
+            "ok": False,
+            "error": "ai_request_failed",
+            "message": "Ошибка при обращении к ИИ."
+        }
 
 
 def get_or_create_telegram_session(tg_profile):
