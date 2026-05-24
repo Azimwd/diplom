@@ -277,7 +277,7 @@ class TelegramWebhookView(APIView):
                 tg_profile=tg_profile, question=question
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer)
 
         if text.startswith("/price "):
             question = text.replace("/price ", "", 1).strip()
