@@ -37,35 +37,6 @@ class TelegramWebhookView(APIView):
     STATE_REGISTER_PASSWORD_CONFIRM = "register_password_confirm"
 
     def post(self, request):
-
-        update = request.data
-
-        if not isinstance(update, dict):
-            return JsonResponse({"ok": True})
-
-        message = update.get("message")
-
-        if not isinstance(message, dict):
-            return JsonResponse({"ok": True})
-
-        text = message.get("text", "").strip()
-
-        chat = message.get("chat") or {}
-        from_user = message.get("from") or {}
-
-        if not isinstance(chat, dict):
-            return JsonResponse({"ok": True})
-
-        if not isinstance(from_user, dict):
-            return JsonResponse({"ok": True})
-
-        chat_id = chat.get("id")
-        telegram_id = from_user.get("id")
-        username = from_user.get("username")
-        first_name = from_user.get("first_name")
-
-        if not chat_id or not telegram_id:
-            return JsonResponse({"ok": True})
         update = request.data
 
         if not isinstance(update, dict):
@@ -107,46 +78,84 @@ class TelegramWebhookView(APIView):
 
         if text == "/start":
             if tg_profile.user:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": True,
+                    "type": "start",
+                    "authenticated": True,
+                    "message": "Вы уже авторизованы."
+                })
 
-            return JsonResponse({"ok": True})
-        
+            return JsonResponse({
+                "ok": True,
+                "type": "start",
+                "authenticated": False,
+                "message": "Используйте /login для входа или /register для регистрации."
+            })
+                
         if text == "/login":
             tg_profile.registration_step = "login_email"
             tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "login_started",
+                "step": "login_email",
+                "message": "Введите email."
+            })
         
         if text == "/register":
             tg_profile.registration_step = "register_email"
             tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "register_started",
+                "step": "register_email",
+                "message": "Введите email для регистрации."
+            })
         
         if tg_profile.registration_step == "register_email":
             email = text.lower().strip()
 
             if Users.objects.filter(email=email).exists():
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "email_already_exists",
+                    "message": "Пользователь с таким email уже существует."
+                })
 
             tg_profile.pending_email = email
             tg_profile.registration_step = "register_password"
             tg_profile.save(update_fields=["pending_email", "registration_step", "updated_at"])
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "register_email_saved",
+                "step": "register_password",
+                "message": "Email сохранён. Введите пароль."
+            })
         
         if tg_profile.registration_step == "register_password":
             password = text.strip()
 
             if len(password) < 8:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "password_too_short",
+                    "message": "Пароль должен содержать минимум 8 символов."
+                })
 
             tg_profile.pending_password = password
             tg_profile.registration_step = "register_password_confirm"
             tg_profile.save(update_fields=["pending_password", "registration_step", "updated_at"])
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "register_password_saved",
+                "step": "register_password_confirm",
+                "message": "Повторите пароль."
+            })
+        
         if tg_profile.registration_step == "register_password_confirm":
             password_confirm = text.strip()
 
@@ -155,7 +164,12 @@ class TelegramWebhookView(APIView):
                 tg_profile.registration_step = "register_password"
                 tg_profile.save(update_fields=["pending_password", "registration_step", "updated_at"])
 
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "passwords_do_not_match",
+                    "step": "register_password",
+                    "message": "Пароли не совпадают. Введите пароль заново."
+                })
 
             user = Users.objects.create_user(
                 email=tg_profile.pending_email,
@@ -183,26 +197,45 @@ class TelegramWebhookView(APIView):
                 ]
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "register_completed",
+                "message": "Регистрация завершена."
+            })
+        
         if tg_profile.registration_step == "login_email":
             email = text.lower().strip()
 
             user = Users.objects.filter(email=email).first()
 
             if not user:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "user_not_found",
+                    "step": "login_email",
+                    "message": "Пользователь с таким email не найден."
+                })
 
             existing_tg = TelegramProfile.objects.filter(user=user).exclude(id=tg_profile.id).first()
 
             if existing_tg:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "telegram_already_linked",
+                    "message": "Этот аккаунт уже привязан к другому Telegram-профилю."
+                })
 
             tg_profile.pending_email = email
             tg_profile.registration_step = "login_password"
             tg_profile.save(update_fields=["pending_email", "registration_step", "updated_at"])
 
-            return JsonResponse({"ok": True})
-        
+            return JsonResponse({
+                "ok": True,
+                "type": "login_email_saved",
+                "step": "login_password",
+                "message": "Email найден. Введите пароль."
+            })
+                
         if tg_profile.registration_step == "login_password":
             password = text.strip()
             email = tg_profile.pending_email
@@ -211,7 +244,12 @@ class TelegramWebhookView(APIView):
                 tg_profile.registration_step = "login_email"
                 tg_profile.save(update_fields=["registration_step", "updated_at"])
 
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "missing_pending_email",
+                    "step": "login_email",
+                    "message": "Email не найден. Введите email заново."
+                })
 
             user = authenticate(
                 request=request,
@@ -220,14 +258,21 @@ class TelegramWebhookView(APIView):
             )
 
             if not user:
-
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "invalid_credentials",
+                    "step": "login_password",
+                    "message": "Неверный email или пароль."
+                })
 
             existing_tg = TelegramProfile.objects.filter(user=user).exclude(id=tg_profile.id).first()
 
             if existing_tg:
-
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "telegram_already_linked",
+                    "message": "Этот аккаунт уже привязан к другому Telegram-профилю."
+                })
 
             tg_profile.user = user
             tg_profile.registration_step = None
@@ -246,98 +291,145 @@ class TelegramWebhookView(APIView):
                 ]
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "login_completed",
+                "message": "Вход выполнен успешно."
+            })
 
         if not tg_profile.user:
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": False,
+                "error": "not_authenticated",
+                "message": "Сначала выполните вход через /login или регистрацию через /register."
+            })
                 
-        if text == "/help":
-            return JsonResponse({"ok": True})
-
-        if text == "/profile":
-            return JsonResponse({"ok": True})
 
         if text == "/new":
             session = ChatSession.objects.create(
-                user=tg_profile.user, title="Telegram chat"
+                user=tg_profile.user,
+                title="Telegram chat"
             )
 
             tg_profile.current_session = session
             tg_profile.save(update_fields=["current_session", "updated_at"])
 
-            return JsonResponse({"ok": True})
+            return JsonResponse({
+                "ok": True,
+                "type": "new_session_created",
+                "session_id": session.id,
+                "message": "Новая Telegram-сессия создана."
+            })
+        
+        if not question:
+            return JsonResponse({
+                "ok": False,
+                "error": "empty_question",
+                "message": "После /ask нужно написать вопрос."
+            })
 
-        if text.startswith("/ask "):
-            question = text.replace("/ask ", "", 1).strip()
+        if text.startswith("/price "):
+            question = text.replace("/price ", "", 1).strip()
 
             if not question:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_question",
+                    "message": "После /price нужно написать вопрос."
+                })
 
-            answer = handle_ai_question_from_telegram(
+            answer = handle_price_question(
                 tg_profile=tg_profile,
                 question=question
             )
 
             return JsonResponse(answer, safe=False)
 
-        if text.startswith("/price "):
-            question = text.replace("/price ", "", 1).strip()
-
-            answer = handle_price_question(tg_profile=tg_profile, question=question)
-
-            return JsonResponse({"ok": True})
-
         if text.startswith("/winchance "):
             question = text.replace("/winchance ", "", 1).strip()
 
+            if not question:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_question",
+                    "message": "После /winchance нужно написать вопрос."
+                })
+
             answer = handle_win_chance_question(
-                tg_profile=tg_profile, question=question
+                tg_profile=tg_profile,
+                question=question
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer, safe=False)
+
         if text.startswith("/toplawyers "):
             question = text.replace("/toplawyers ", "", 1).strip()
 
             if not question:
-                return JsonResponse({"ok": True})
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_question",
+                    "message": "После /toplawyers нужно написать вопрос."
+                })
 
             answer = handle_top_lawyers_question(
                 tg_profile=tg_profile,
                 question=question
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer, safe=False)
+        
         if text == "/docs":
             documents = get_documents_list()
 
-            message = "Доступные документы:\n\n"
+            answer = {
+                "ok": True,
+                "type": "documents_list",
+                "documents": documents,
+                "message": "Доступные документы получены."
+            }
 
-            for doc in documents:
-                message += f"• {doc.get('title')}\n"
-
-            message += "\nЧтобы выбрать документ, напишите:\n/doc название документа"
-
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer, safe=False)
 
         if text.startswith("/doc "):
             document_query = text.replace("/doc ", "", 1).strip()
 
+            if not document_query:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_document_query",
+                    "message": "После /doc нужно указать название документа."
+                })
+
             answer = handle_telegram_document_select(
-                tg_profile=tg_profile, document_query=document_query
+                tg_profile=tg_profile,
+                document_query=document_query
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer, safe=False)
 
         if text.startswith("/generate "):
             raw_json = text.replace("/generate ", "", 1).strip()
 
+            if not raw_json:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "empty_generate_payload",
+                    "message": "После /generate нужно передать JSON с данными документа."
+                })
+
             answer = handle_telegram_document_generate(
-                tg_profile=tg_profile, raw_json=raw_json
+                tg_profile=tg_profile,
+                raw_json=raw_json
             )
 
-            return JsonResponse({"ok": True})
+            return JsonResponse(answer, safe=False)
 
-        return JsonResponse({"ok": True})
+        return JsonResponse({
+            "ok": False,
+            "error": "unknown_command",
+            "message": "Неизвестная команда. Используйте /help для списка команд."
+        })
 
 
 from chats.models import ChatSession, ChatMessage
@@ -420,13 +512,24 @@ def handle_price_question(tg_profile, question):
         limit_response = consume_user_token(user)
 
         if limit_response:
-            return "У вас закончились бесплатные запросы."
+            return {
+                "ok": False,
+                "error": "limit_exceeded",
+                "message": "У вас закончились бесплатные запросы."
+            }
 
-        ChatMessage.objects.create(session=session, role="user", content=question)
+        ChatMessage.objects.create(
+            session=session,
+            role="user",
+            content=question
+        )
 
         r = requests.post(
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/price",
-            json={"question": question, "session_id": session.id},
+            json={
+                "question": question,
+                "session_id": session.id
+            },
             timeout=120,
         )
 
@@ -434,19 +537,22 @@ def handle_price_question(tg_profile, question):
 
         data = r.json()
 
-        telegram_answer = json_to_telegram_text(data)
-
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=telegram_answer
+            content=json.dumps(data, ensure_ascii=False)
         )
 
-        return telegram_answer
+        return data
 
-    except Exception as e:
-        return "Ошибка при расчёте стоимости дела."
+    except Exception:
+        traceback.print_exc()
 
+        return {
+            "ok": False,
+            "error": "price_request_failed",
+            "message": "Ошибка при расчёте стоимости дела."
+        }
 
 def handle_win_chance_question(tg_profile, question):
     try:
@@ -456,13 +562,24 @@ def handle_win_chance_question(tg_profile, question):
         limit_response = consume_user_token(user)
 
         if limit_response:
-            return "У вас закончились бесплатные запросы."
+            return {
+                "ok": False,
+                "error": "limit_exceeded",
+                "message": "У вас закончились бесплатные запросы."
+            }
 
-        ChatMessage.objects.create(session=session, role="user", content=question)
+        ChatMessage.objects.create(
+            session=session,
+            role="user",
+            content=question
+        )
 
         r = requests.post(
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/article-win-chance",
-            json={"question": question, "session_id": session.id},
+            json={
+                "question": question,
+                "session_id": session.id
+            },
             timeout=120,
         )
 
@@ -470,18 +587,22 @@ def handle_win_chance_question(tg_profile, question):
 
         data = r.json()
 
-        telegram_answer = json_to_telegram_text(data)
-
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=telegram_answer
+            content=json.dumps(data, ensure_ascii=False)
         )
 
-        return telegram_answer
+        return data
 
-    except Exception as e:
-        return "Ошибка при анализе шансов."
+    except Exception:
+        traceback.print_exc()
+
+        return {
+            "ok": False,
+            "error": "win_chance_request_failed",
+            "message": "Ошибка при анализе шансов."
+        }
 
 
 def handle_telegram_document_select(tg_profile, document_query):
@@ -500,22 +621,19 @@ def handle_telegram_document_select(tg_profile, document_query):
             break
 
     if not found_template:
-        return "Документ не найден. Напишите /docs, чтобы посмотреть список документов."
+        return {
+            "ok": False,
+            "error": "document_not_found",
+            "message": "Документ не найден. Напишите /docs, чтобы посмотреть список документов."
+        }
 
     document = get_document(found_template)
-
-    fields_text = ""
-
-    for field in document["fields"]:
-        required = "обязательное" if field.get("required") else "необязательное"
-        fields_text += (
-            f"\n• {field['key']} — {field.get('label', field['key'])} ({required})"
-        )
 
     tg_profile.current_template_name = found_template
     tg_profile.save(update_fields=["current_template_name", "updated_at"])
 
     response_data = {
+        "ok": True,
         "type": "document_selected",
         "template_name": found_template,
         "title": document["title"],
@@ -523,15 +641,13 @@ def handle_telegram_document_select(tg_profile, document_query):
         "message": "Документ выбран. Заполните поля и отправьте /generate JSON."
     }
 
-    telegram_answer = json_to_telegram_text(response_data)
-
     ChatMessage.objects.create(
         session=session,
         role="assistant",
-        content=telegram_answer
+        content=json.dumps(response_data, ensure_ascii=False)
     )
 
-    return telegram_answer
+    return response_data
 
 
 def handle_telegram_document_generate(tg_profile, raw_json):
@@ -542,20 +658,34 @@ def handle_telegram_document_generate(tg_profile, raw_json):
         template_name = tg_profile.current_template_name
 
         if not template_name:
-            return "Сначала выберите документ через /doc название документа."
+            return {
+                "ok": False,
+                "error": "template_not_selected",
+                "message": "Сначала выберите документ через /doc название документа."
+            }
 
         if template_name not in DOCUMENT_TYPES:
-            return "Выбранный документ больше не найден. Выберите заново через /docs."
+            return {
+                "ok": False,
+                "error": "template_not_found",
+                "message": "Выбранный документ больше не найден. Выберите заново через /docs."
+            }
 
         try:
             values = json.loads(raw_json)
         except json.JSONDecodeError:
-            return (
-                'Ошибка JSON. Отправьте данные в формате: /generate {"field": "value"}'
-            )
+            return {
+                "ok": False,
+                "error": "invalid_json",
+                "message": 'Ошибка JSON. Отправьте данные в формате: /generate {"field": "value"}'
+            }
 
         if not isinstance(values, dict):
-            return "После /generate должен быть JSON-объект."
+            return {
+                "ok": False,
+                "error": "invalid_json_type",
+                "message": "После /generate должен быть JSON-объект."
+            }
 
         document = get_document(template_name)
 
@@ -566,39 +696,57 @@ def handle_telegram_document_generate(tg_profile, raw_json):
         missing = [key for key in required_keys if not values.get(key)]
 
         if missing:
-            return "Заполнены не все обязательные поля:\n\n" + "\n".join(
-                [f"• {key}" for key in missing]
-            )
+            return {
+                "ok": False,
+                "error": "missing_required_fields",
+                "missing_fields": missing,
+                "message": "Заполнены не все обязательные поля."
+            }
 
         limit_response = consume_user_token(user)
+
         if limit_response:
-            return "У вас закончились бесплатные запросы."
+            return {
+                "ok": False,
+                "error": "limit_exceeded",
+                "message": "У вас закончились бесплатные запросы."
+            }
 
         ChatMessage.objects.create(
-            session=session, role="user", content=f"Создание документа: {template_name}"
+            session=session,
+            role="user",
+            content=f"Создание документа: {template_name}"
         )
 
         generator_response = send_to_generator(
-            template_name=template_name, values=values
+            template_name=template_name,
+            values=values
         )
 
         if generator_response.get("error"):
-            return "Ошибка при создании документа."
-
-
-
-        telegram_answer = json_to_telegram_text(generator_response)
+            return {
+                "ok": False,
+                "error": "document_generation_failed",
+                "message": "Ошибка при создании документа.",
+                "details": generator_response
+            }
 
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=telegram_answer
+            content=json.dumps(generator_response, ensure_ascii=False)
         )
 
-        return telegram_answer
-            
-    except Exception as e:
-        return "Ошибка при создании документа."
+        return generator_response
+
+    except Exception:
+        traceback.print_exc()
+
+        return {
+            "ok": False,
+            "error": "document_generation_exception",
+            "message": "Ошибка при создании документа."
+        }
 
 def handle_top_lawyers_question(tg_profile, question):
     try:
@@ -608,7 +756,11 @@ def handle_top_lawyers_question(tg_profile, question):
         limit_response = consume_user_token(user)
 
         if limit_response:
-            return "У вас закончились бесплатные запросы."
+            return {
+                "ok": False,
+                "error": "limit_exceeded",
+                "message": "У вас закончились бесплатные запросы."
+            }
 
         ChatMessage.objects.create(
             session=session,
@@ -630,15 +782,19 @@ def handle_top_lawyers_question(tg_profile, question):
 
         data = r.json()
 
-        telegram_answer = json_to_telegram_text(data)
-
         ChatMessage.objects.create(
             session=session,
             role="assistant",
-            content=telegram_answer
+            content=json.dumps(data, ensure_ascii=False)
         )
 
-        return telegram_answer
+        return data
 
-    except Exception as e:
-        return "Ошибка при поиске топ адвокатов."
+    except Exception:
+        traceback.print_exc()
+
+        return {
+            "ok": False,
+            "error": "top_lawyers_request_failed",
+            "message": "Ошибка при поиске топ адвокатов."
+        }
