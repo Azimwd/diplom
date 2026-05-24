@@ -298,8 +298,7 @@ import requests
 from django.http import HttpResponse
 from rest_framework.exceptions import ErrorDetail
 from django.utils import timezone
-from datetime import timedelta
-from .models import RegistrationSession, SocialOnboardingSession, Users
+from .models import SocialOnboardingSession, Users
 
 ACCESS_COOKIE_NAME = "access_token"
 REFRESH_COOKIE_NAME = "refresh_token"
