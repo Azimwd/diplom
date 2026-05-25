@@ -8,6 +8,8 @@ import urllib.parse
 from django.contrib.auth import get_user_model
 from rest_framework.views import APIView, Response
 from rest_framework import status
+from django.shortcuts import redirect
+from rest_framework.permissions import AllowAny
 
 User = get_user_model()
 
@@ -123,23 +125,33 @@ class CreateSubscriptionInvoiceView(APIView):
 
 
 class RobokassaSuccessView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         inv_id = request.GET.get("InvId")
 
         if not inv_id:
-            return HttpResponse("inv_id! Оплата прошла успешно.")
+            return redirect(f"{settings.FRONTEND_URL}/payment/success")
 
         try:
             payment = Payment.objects.get(invoice_id=inv_id)
         except Payment.DoesNotExist:
-            return HttpResponse("DoesNotExist! Оплата прошла успешно.")
+            return redirect(f"{settings.FRONTEND_URL}/payment/success?status=not_found")
 
-        return HttpResponse("Спасибо! Оплата прошла успешно.")
-
+        return redirect(
+            f"{settings.FRONTEND_URL}/payment/success?invoice_id={payment.invoice_id}"
+        )
 
 
 class RobokassaFailView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
-        return HttpResponse("Оплата не удалась. Попробуйте снова.")
+        inv_id = request.GET.get("InvId")
+
+        if inv_id:
+            return redirect(f"{settings.FRONTEND_URL}/payment/fail?invoice_id={inv_id}")
+
+        return redirect(f"{settings.FRONTEND_URL}/payment/fail")
     
 
