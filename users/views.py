@@ -762,12 +762,10 @@ class TokenRefreshView(APIView):
     def post(self, request):
         old_refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
         if not old_refresh:
-            resp = Response(
+            return Response(
                 {"detail": "No refresh"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-            clear_auth_cookies(resp)
-            return resp
 
         try:
             refresh = RefreshToken(old_refresh)
