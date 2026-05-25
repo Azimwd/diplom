@@ -857,13 +857,9 @@ class UserInfoView(APIView):
         user = request.user
         response = Response(
             {
-                "statusCode": 200,
-                "success": True,
-                "data": {
-                    "id": user.id,
-                    "email": user.email,
-                    "role": user.role,
-                },
+                "id": user.id,
+                "email": user.email,
+                "role": user.role,
                 "message": "Успешный вход",
             },
             status=status.HTTP_200_OK,
