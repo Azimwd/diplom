@@ -628,14 +628,10 @@ class LoginView(APIView):
 
         response = Response(
             {
-                "statusCode": 200,
-                "success": True,
-                "data": {
-                    "id": user.id,
-                    "email": user.email,
-                    "role": getattr(user, "role", None),
-                    "csrf_token": csrf_token,
-                },
+                "id": user.id,
+                "email": user.email,
+                "role": getattr(user, "role", None),
+                "csrf_token": csrf_token,
                 "message": "Успешный вход",
             },
             status=status.HTTP_200_OK,
