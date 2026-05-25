@@ -801,7 +801,15 @@ class TokenRefreshView(APIView):
         new_refresh = RefreshToken.for_user(user)
         new_access = str(new_refresh.access_token)
 
-        resp = Response({"success": True}, status=status.HTTP_200_OK)
+        csrf_token = get_token(request)
+
+        resp = Response(
+            {
+                "success": True,
+                "csrf_token": csrf_token,
+            },
+            status=status.HTTP_200_OK,
+        )
 
         resp.set_cookie(
             key=ACCESS_COOKIE_NAME,
