@@ -624,6 +624,8 @@ class LoginView(APIView):
         refresh_token = str(refresh)
         
 
+        csrf_token = get_token(request)
+
         response = Response(
             {
                 "statusCode": 200,
@@ -632,6 +634,7 @@ class LoginView(APIView):
                     "id": user.id,
                     "email": user.email,
                     "role": getattr(user, "role", None),
+                    "csrf_token": csrf_token,
                 },
                 "message": "Успешный вход",
             },
