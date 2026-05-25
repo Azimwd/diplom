@@ -29,7 +29,7 @@ class Subscription(models.Model):
   
         if not self.end_date and self.plan:
             if self.plan == '1m':
-                self.end_date = self.start_date + timedelta(minutes=1)
+                self.end_date = self.start_date + timedelta(days=30)
             elif self.plan == '6m':
                 self.end_date = self.start_date + timedelta(days=180)
             elif self.plan == '1y':

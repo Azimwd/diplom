@@ -74,7 +74,7 @@ class RobokassaResultView(APIView):
             payment.save()
 
             duration_map = {
-                "1m": timedelta(minutes=1),
+                "1m": timedelta(days=30),
                 "6m": timedelta(days=180),
                 "1y": timedelta(days=365),
             }

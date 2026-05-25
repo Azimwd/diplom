@@ -687,11 +687,10 @@ class SessionPingView(APIView):
     def get(self, request):
         refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
         if not refresh:
-            resp = Response(
-                {"detail": "No session"}, status=status.HTTP_401_UNAUTHORIZED
+            return Response(
+                {"detail": "No session"},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
-            clear_auth_cookies(resp)
-            return resp
 
         try:
             RefreshToken(refresh)
