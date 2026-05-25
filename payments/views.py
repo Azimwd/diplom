@@ -10,6 +10,11 @@ from rest_framework.views import APIView, Response
 from rest_framework import status
 from django.shortcuts import redirect
 from rest_framework.permissions import AllowAny
+from subscriptions.models import Subscription
+from django.utils.timezone import timedelta
+from django.db import transaction
+from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 
 User = get_user_model()
 
@@ -46,47 +51,101 @@ class GetInvoiceUrlView(APIView):
         return JsonResponse({"url": url})
 
 
-from subscriptions.models import Subscription
-from django.utils.timezone import now, timedelta
+
 
 class RobokassaResultView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
-        out_sum = request.POST.get('OutSum')
-        inv_id = request.POST.get('InvId')
-        received_sig = request.POST.get('SignatureValue', '').upper()
+        out_sum = request.POST.get("OutSum")
+        inv_id = request.POST.get("InvId")
+        received_sig = request.POST.get("SignatureValue", "").upper()
 
         if not all([out_sum, inv_id, received_sig]):
             return HttpResponse("error: missing data")
 
         password2 = settings.ROBOKASSA_PASSWORD2
+
         signature_str = f"{out_sum}:{inv_id}:{password2}"
-        expected_sig = hashlib.md5(signature_str.encode('utf-8')).hexdigest().upper()
+        expected_sig = hashlib.md5(
+            signature_str.encode("utf-8")
+        ).hexdigest().upper()
 
         if received_sig != expected_sig:
             return HttpResponse("error: signature mismatch")
 
         try:
-            inv_id = int(inv_id)
-            payment = Payment.objects.get(invoice_id=inv_id)
-        except (ValueError, Payment.DoesNotExist):
-            return HttpResponse("error: no such order")
+            inv_id_int = int(inv_id)
+        except ValueError:
+            return HttpResponse("error: invalid invoice id")
 
-        if not payment.is_paid:
-            payment.is_paid = True
-            payment.save()
+        duration_map = {
+            "1m": timedelta(days=30),
+            "6m": timedelta(days=180),
+            "1y": timedelta(days=365),
+        }
 
-            duration_map = {
-                "1m": timedelta(days=30),
-                "6m": timedelta(days=180),
-                "1y": timedelta(days=365),
-            }
-            plan = payment.plan
-            if plan in duration_map:
+        try:
+            with transaction.atomic():
+                payment = Payment.objects.select_for_update().get(
+                    invoice_id=inv_id_int
+                )
+
+                # Проверяем сумму оплаты
+                try:
+                    robokassa_amount = Decimal(out_sum).quantize(Decimal("0.01"))
+                    payment_amount = Decimal(payment.amount).quantize(Decimal("0.01"))
+                except InvalidOperation:
+                    return HttpResponse("error: invalid amount")
+
+                if robokassa_amount != payment_amount:
+                    return HttpResponse("error: amount mismatch")
+
+                # Если уже оплачено, просто возвращаем OK.
+                # Robokassa может отправить callback повторно.
+                if payment.is_paid:
+                    return HttpResponse(f"OK{inv_id}")
+
+                plan = payment.plan
+
+                if plan not in duration_map:
+                    return HttpResponse("error: invalid subscription plan")
+
+                now_time = timezone.now()
+
+                # Ищем последнюю активную подписку пользователя
+                active_subscription = (
+                    Subscription.objects
+                    .select_for_update()
+                    .filter(
+                        user=payment.payer,
+                        end_date__gt=now_time
+                    )
+                    .order_by("-end_date")
+                    .first()
+                )
+
+                # Если активная подписка уже есть — продлеваем от её end_date.
+                # Если активной нет — начинаем с текущего времени.
+                if active_subscription:
+                    start_date = active_subscription.end_date
+                else:
+                    start_date = now_time
+
+                end_date = start_date + duration_map[plan]
+
                 Subscription.objects.create(
                     user=payment.payer,
                     plan=plan,
-                    end_date=now() + duration_map[plan]
+                    start_date=start_date,
+                    end_date=end_date
                 )
+
+                payment.is_paid = True
+                payment.save(update_fields=["is_paid"])
+
+        except Payment.DoesNotExist:
+            return HttpResponse("error: no such order")
 
         return HttpResponse(f"OK{inv_id}")
 
