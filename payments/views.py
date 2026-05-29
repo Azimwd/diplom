@@ -1,22 +1,28 @@
 import hashlib
+import urllib.parse
+from decimal import Decimal, InvalidOperation
+from datetime import timedelta
+
 from django.conf import settings
+from django.db import transaction
 from django.http import JsonResponse, HttpResponse
+from django.shortcuts import redirect
+from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from .models import Payment
 from .utils import generate_unique_invoice_id
-from rest_framework.permissions import IsAuthenticated
-import urllib.parse
-from django.contrib.auth import get_user_model
-from rest_framework.views import APIView, Response
-from rest_framework import status
-from django.shortcuts import redirect
-from rest_framework.permissions import AllowAny
 from subscriptions.models import Subscription
-from django.utils.timezone import timedelta
-from django.db import transaction
-from django.utils import timezone
-from decimal import Decimal, InvalidOperation
 
-User = get_user_model()
+from .services import (
+    create_subscription_payment,
+    build_robokassa_url,
+    SUBSCRIPTION_PLANS,
+)
 
 class GetInvoiceUrlView(APIView):
     permission_classes = [IsAuthenticated]
@@ -79,11 +85,7 @@ class RobokassaResultView(APIView):
         except ValueError:
             return HttpResponse("error: invalid invoice id")
 
-        duration_map = {
-            "1m": timedelta(days=30),
-            "6m": timedelta(days=180),
-            "1y": timedelta(days=365),
-        }
+
 
         try:
             with transaction.atomic():
@@ -108,9 +110,9 @@ class RobokassaResultView(APIView):
 
                 plan = payment.plan
 
-                if plan not in duration_map:
+                if plan not in SUBSCRIPTION_PLANS:
                     return HttpResponse("error: invalid subscription plan")
-
+                
                 now_time = timezone.now()
 
                 # Ищем последнюю активную подписку пользователя
@@ -132,7 +134,7 @@ class RobokassaResultView(APIView):
                 else:
                     start_date = now_time
 
-                end_date = start_date + duration_map[plan]
+                end_date = start_date + SUBSCRIPTION_PLANS[plan]["duration"]
 
                 Subscription.objects.create(
                     user=payment.payer,
@@ -154,33 +156,27 @@ class CreateSubscriptionInvoiceView(APIView):
 
     def post(self, request):
         plan = request.data.get("plan")
-        amount_map = {
-            "1m": 10000,
-            "6m": 50000,
-            "1y": 90000,
-        }
-        
-        if plan not in amount_map:
+
+        try:
+            payment = create_subscription_payment(
+                user=request.user,
+                plan=plan
+            )
+        except ValueError:
             return JsonResponse({"error": "Invalid plan"}, status=400)
 
-        payment = Payment.objects.create(
-            payer=request.user,
-            receiver=None,
-            amount=amount_map[plan],
-            invoice_id=generate_unique_invoice_id(),
-            purpose="subscription",
-            plan=plan
+        url = build_robokassa_url(
+            payment=payment,
+            email=request.user.email
         )
 
-        response = Response({
+        return Response({
             "invoice_id": payment.invoice_id,
             "plan": plan,
             "amount": payment.amount,
-            "message": "Подписку создана"
+            "url": url,
+            "message": "Счёт на подписку создан."
         }, status=status.HTTP_200_OK)
-
-        return response
-
 
 
 class RobokassaSuccessView(APIView):

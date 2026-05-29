@@ -18,6 +18,14 @@ from ai_documents.services.generator_client import send_to_generator
 from subscriptions.services.usage_limits import consume_user_token
 from chats.models import ChatSession, ChatMessage
 from django.contrib.auth import authenticate
+from django.utils import timezone
+from subscriptions.models import Subscription
+from payments.services import (
+    create_subscription_payment,
+    build_robokassa_url,
+    get_subscription_plans_for_response,
+    SUBSCRIPTION_PLANS,
+)
 
 def json_to_telegram_text(data):
     return json.dumps(data, ensure_ascii=False, indent=2)
@@ -303,7 +311,33 @@ class TelegramWebhookView(APIView):
                 "error": "not_authenticated",
                 "message": "Сначала выполните вход через /login или регистрацию через /register."
             })
-                
+        
+        if text == "/plans":
+            answer = get_telegram_subscription_plans()
+            return JsonResponse(answer, safe=False)
+
+        if text.startswith("/subscribe"):
+            parts = text.split()
+
+            if len(parts) != 2:
+                return JsonResponse({
+                    "ok": False,
+                    "error": "invalid_subscribe_command",
+                    "message": "Используйте команду: /subscribe 1m, /subscribe 6m или /subscribe 1y"
+                })
+
+            plan = parts[1].strip()
+
+            answer = create_telegram_subscription_invoice(
+                tg_profile=tg_profile,
+                plan=plan
+            )
+
+            return JsonResponse(answer, safe=False)
+
+        if text == "/subscription":
+            answer = get_telegram_subscription_status(tg_profile)
+            return JsonResponse(answer, safe=False)    
 
         if text == "/new":
             session = ChatSession.objects.create(
@@ -808,3 +842,105 @@ def handle_top_lawyers_question(tg_profile, question):
             "error": "top_lawyers_request_failed",
             "message": "Ошибка при поиске топ адвокатов."
         }
+    
+def get_telegram_subscription_plans():
+    plans = get_subscription_plans_for_response()
+
+    return {
+        "ok": True,
+        "type": "subscription_plans",
+        "plans": plans,
+        "message": (
+            "Доступные тарифы:\n"
+            "1 месяц — /subscribe 1m\n"
+            "6 месяцев — /subscribe 6m\n"
+            "1 год — /subscribe 1y"
+        )
+    }
+
+
+def create_telegram_subscription_invoice(tg_profile, plan):
+    user = tg_profile.user
+
+    if not user:
+        return {
+            "ok": False,
+            "error": "not_authenticated",
+            "message": "Сначала выполните вход через /login или регистрацию через /register."
+        }
+
+    if plan not in SUBSCRIPTION_PLANS:
+        return {
+            "ok": False,
+            "error": "invalid_plan",
+            "message": "Неверный тариф. Используйте: /subscribe 1m, /subscribe 6m или /subscribe 1y"
+        }
+
+    payment = create_subscription_payment(
+        user=user,
+        plan=plan
+    )
+
+    payment_url = build_robokassa_url(
+        payment=payment,
+        email=user.email
+    )
+
+    plan_data = SUBSCRIPTION_PLANS[plan]
+
+    return {
+        "ok": True,
+        "type": "telegram_subscription_invoice_created",
+        "invoice_id": payment.invoice_id,
+        "plan": plan,
+        "amount": str(plan_data["amount"]),
+        "payment_url": payment_url,
+        "message": (
+            f"Счёт на оплату создан.\n"
+            f"Тариф: {plan_data['title']}\n"
+            f"Сумма: {plan_data['amount']} ₸\n\n"
+            f"Ссылка для оплаты:\n{payment_url}\n\n"
+            f"После оплаты отправьте команду /subscription, чтобы проверить статус подписки."
+        )
+    }
+
+
+def get_telegram_subscription_status(tg_profile):
+    user = tg_profile.user
+
+    if not user:
+        return {
+            "ok": False,
+            "error": "not_authenticated",
+            "message": "Сначала выполните вход через /login или регистрацию через /register."
+        }
+
+    now_time = timezone.now()
+
+    subscription = (
+        Subscription.objects
+        .filter(
+            user=user,
+            end_date__gt=now_time
+        )
+        .order_by("-end_date")
+        .first()
+    )
+
+    if not subscription:
+        return {
+            "ok": True,
+            "type": "subscription_status",
+            "active": False,
+            "message": "Активной подписки нет. Для выбора тарифа отправьте /plans."
+        }
+
+    return {
+        "ok": True,
+        "type": "subscription_status",
+        "active": True,
+        "plan": subscription.plan,
+        "start_date": subscription.start_date.isoformat(),
+        "end_date": subscription.end_date.isoformat(),
+        "message": f"Подписка активна до {subscription.end_date.strftime('%d.%m.%Y %H:%M')}."
+    }
