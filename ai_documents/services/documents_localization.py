@@ -556,6 +556,6 @@ def normalize_language(language):
     language = str(language).lower().strip()
 
     if language in ["kz", "kk", "kaz", "қазақша"]:
-        return "kz"
+        return "kk"
 
     return "ru"
