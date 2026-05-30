@@ -1,19 +1,19 @@
 import requests
 
 from .documents import DOCUMENT_TYPES
+from .documents_localization import (
+    get_localized_documents,
+    normalize_language,
+)
 
 
 AI_DOCUMENT_DETECT_URL = "https://etha-hypercatalectic-rueben.ngrok-free.dev/documents/match-template"
 
 
 def detect_document_type(question: str, language: str = "ru"):
-    documents = [
-        {
-            "template_name": template_name,
-            "title": data["title"]
-        }
-        for template_name, data in DOCUMENT_TYPES.items()
-    ]
+    language = normalize_language(language)
+
+    documents = get_localized_documents(DOCUMENT_TYPES, language)
 
     payload = {
         "question": question,
@@ -26,6 +26,7 @@ def detect_document_type(question: str, language: str = "ru"):
             "confidence": "number"
         }
     }
+
     try:
         response = requests.post(
             AI_DOCUMENT_DETECT_URL,
@@ -49,7 +50,9 @@ def detect_document_type(question: str, language: str = "ru"):
             "found": False,
             "template_name": None,
             "confidence": 0,
-            "error": "AI returned non-json response"
+            "error": "AI returned non-json response",
+            "status_code": response.status_code,
+            "raw_response": response.text[:1000]
         }
 
     if response.status_code >= 400:
@@ -59,6 +62,7 @@ def detect_document_type(question: str, language: str = "ru"):
             "template_name": None,
             "confidence": 0,
             "error": "AI returned error",
+            "status_code": response.status_code,
             "ai_response": result
         }
 
@@ -77,25 +81,9 @@ def detect_document_type(question: str, language: str = "ru"):
     if intent not in allowed_intents:
         intent = "unknown"
 
-    if intent == "documents_list":
+    if intent in ["documents_list", "clarification", "unknown"]:
         return {
-            "intent": "documents_list",
-            "found": False,
-            "template_name": None,
-            "confidence": confidence
-        }
-
-    if intent == "clarification":
-        return {
-            "intent": "clarification",
-            "found": False,
-            "template_name": None,
-            "confidence": confidence
-        }
-
-    if intent == "unknown":
-        return {
-            "intent": "unknown",
+            "intent": intent,
             "found": False,
             "template_name": None,
             "confidence": confidence

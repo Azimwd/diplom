@@ -1,21 +1,33 @@
 import requests
 
+from .documents_localization import normalize_language
+
+
 AI_GENERATOR_URL = "https://etha-hypercatalectic-rueben.ngrok-free.dev/generate"
 
 
-    
-def send_to_generator(template_name, values, language = "ru"):
+def send_to_generator(template_name, values, language="ru"):
+    language = normalize_language(language)
+
     payload = {
         "template_name": template_name,
         "values": values,
         "language": language,
     }
 
-    response = requests.post(
-        AI_GENERATOR_URL,
-        json=payload,
-        timeout=120
-    )
+    try:
+        response = requests.post(
+            AI_GENERATOR_URL,
+            json=payload,
+            timeout=120
+        )
+    except requests.RequestException as exc:
+        return {
+            "error": True,
+            "status_code": None,
+            "response": str(exc),
+            "payload_sent": payload
+        }
 
     try:
         response_data = response.json()

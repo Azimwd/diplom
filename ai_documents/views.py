@@ -12,6 +12,10 @@ from .services.ai_detector import detect_document_type
 from .services.generator_client import send_to_generator
 from subscriptions.services.usage_limits import consume_user_token
 
+from .services.documents_localization import (
+    get_localized_documents,
+    get_localized_document,
+)
 
 class AiDocumentChatView(APIView):
     permission_classes = [IsAuthenticated]
@@ -41,7 +45,7 @@ class AiDocumentChatView(APIView):
             return self.handle_ask(session, question, language)
 
         if action == "select":
-            return self.handle_select(session, template_name)
+            return self.handle_select(session, template_name, language)
 
         if action == "generate":
             return self.handle_generate(
@@ -76,7 +80,6 @@ class AiDocumentChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-
         detected = detect_document_type(
             question=question,
             language=language
@@ -85,8 +88,12 @@ class AiDocumentChatView(APIView):
         if detected.get("intent") == "documents_list":
             payload = {
                 "type": "documents_list",
-                "reply": "Вы можете создать следующие документы:",
-                "documents": get_documents_list(),
+                "reply": (
+                    "Сіз келесі құжаттарды жасай аласыз:"
+                    if language == "kz"
+                    else "Вы можете создать следующие документы:"
+                ),
+                "documents": get_localized_documents(DOCUMENT_TYPES, language),
                 "next_step": "select_document"
             }
 
@@ -98,18 +105,30 @@ class AiDocumentChatView(APIView):
             if template_name not in DOCUMENT_TYPES:
                 payload = {
                     "type": "documents_list",
-                    "reply": "ИИ вернул неизвестный документ. Выберите документ из списка.",
-                    "documents": get_documents_list(),
+                    "reply": (
+                        "ЖИ белгісіз құжатты қайтарды. Тізімнен құжатты таңдаңыз."
+                        if language == "kz"
+                        else "ИИ вернул неизвестный документ. Выберите документ из списка."
+                    ),
+                    "documents": get_localized_documents(DOCUMENT_TYPES, language),
                     "next_step": "select_document"
                 }
 
                 return Response(payload)
 
-            document = get_document(template_name)
+            document = get_localized_document(
+                template_name=template_name,
+                document_types=DOCUMENT_TYPES,
+                language=language
+            )
 
             payload = {
                 "type": "document_fields",
-                "reply": f"Составить {document['title'].lower()}?",
+                "reply": (
+                    f"{document['title']} құжатын жасау керек пе?"
+                    if language == "kz"
+                    else f"Составить {document['title'].lower()}?"
+                ),
                 "template_name": template_name,
                 "document_title": document["title"],
                 "fields": document["fields"],
@@ -118,17 +137,20 @@ class AiDocumentChatView(APIView):
 
             return Response(payload)
 
-        # Если ИИ не понял документ
         payload = {
             "type": "documents_list",
-            "reply": "Я не смог точно определить документ. Выберите документ из списка.",
-            "documents": get_documents_list(),
+            "reply": (
+                "Мен құжатты нақты анықтай алмадым. Тізімнен құжатты таңдаңыз."
+                if language == "kz"
+                else "Я не смог точно определить документ. Выберите документ из списка."
+            ),
+            "documents": get_localized_documents(DOCUMENT_TYPES, language),
             "next_step": "select_document"
         }
 
         return Response(payload)
 
-    def handle_select(self, session, template_name):
+    def handle_select(self, session, template_name, language):
         if not template_name:
             return Response(
                 {"detail": "Поле template_name обязательно."},
@@ -141,11 +163,19 @@ class AiDocumentChatView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        document = get_document(template_name)
+        document = get_localized_document(
+            template_name=template_name,
+            document_types=DOCUMENT_TYPES,
+            language=language
+        )
 
         assistant_payload = {
             "type": "document_fields",
-            "reply": f"Заполните поля для документа: {document['title']}",
+            "reply": (
+                f"Құжат үшін өрістерді толтырыңыз: {document['title']}"
+                if language == "kz"
+                else f"Заполните поля для документа: {document['title']}"
+            ),
             "template_name": template_name,
             "document_title": document["title"],
             "fields": document["fields"],
@@ -178,6 +208,12 @@ class AiDocumentChatView(APIView):
 
         document = get_document(template_name)
 
+        localized_document = get_localized_document(
+            template_name=template_name,
+            document_types=DOCUMENT_TYPES,
+            language=language
+        )
+
         required_keys = [
             field["key"]
             for field in document["fields"]
@@ -192,9 +228,13 @@ class AiDocumentChatView(APIView):
         if missing:
             return Response(
                 {
-                    "detail": "Заполнены не все обязательные поля.",
+                    "detail": (
+                        "Барлық міндетті өрістер толтырылмаған."
+                        if language == "kz"
+                        else "Заполнены не все обязательные поля."
+                    ),
                     "missing_fields": missing,
-                    "fields": document["fields"]
+                    "fields": localized_document["fields"]
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -212,7 +252,11 @@ class AiDocumentChatView(APIView):
         if generator_response.get("error"):
             return Response(
                 {
-                    "detail": "Ошибка внешнего генератора.",
+                    "detail": (
+                        "Сыртқы генератор қатесі."
+                        if language == "kz"
+                        else "Ошибка внешнего генератора."
+                    ),
                     "generator_response": generator_response
                 },
                 status=status.HTTP_400_BAD_REQUEST
@@ -228,9 +272,13 @@ class AiDocumentChatView(APIView):
 
         assistant_payload = {
             "type": "document_generated",
-            "reply": "Документ успешно сгенерирован.",
+            "reply": (
+                "Құжат сәтті жасалды."
+                if language == "kz"
+                else "Документ успешно сгенерирован."
+            ),
             "template_name": template_name,
-            "document_title": document["title"],
+            "document_title": localized_document["title"],
             "file_url": file_url,
             "generator_response": generator_response
         }
