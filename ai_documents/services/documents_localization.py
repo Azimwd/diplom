@@ -493,47 +493,52 @@ def get_localized_documents(document_types: dict, language: str = "ru") -> list[
     return documents
 
 
-def get_localized_document(template_name: str, data: dict, language: str = "ru") -> dict:
-    localized = deepcopy(data)
+def get_localized_document(template_name, document_types, language="ru"):
+    language = normalize_language(language)
 
-    if is_kazakh_language(language):
-        localized["title"] = KZ_DOCUMENT_TITLES.get(
-            template_name,
-            localized.get("title", template_name),
+    document = document_types.get(template_name)
+
+    if not document:
+        return None
+
+    title = document.get("title", template_name)
+
+    if language == "kk":
+        title = KZ_DOCUMENT_TITLES.get(template_name, title)
+
+    return {
+        **document,
+        "title": title,
+        "fields": get_localized_fields(
+            document.get("fields", []),
+            language
         )
-        localized["fields"] = get_localized_fields(
-            localized.get("fields", []),
-            language,
-        )
-
-    return localized
+    }
 
 
-def get_localized_fields(fields: list[dict], language: str = "ru") -> list[dict]:
-    if not is_kazakh_language(language):
+def get_localized_fields(fields, language="ru"):
+    language = normalize_language(language)
+
+    if language != "kk":
         return fields
 
     localized_fields = []
 
     for field in fields:
-        item = deepcopy(field)
-        key = item.get("key", "")
-        label = KZ_FIELD_LABELS.get(key) or humanize_field_key_kz(key)
+        key = field.get("key")
+        kz_label = KZ_FIELD_LABELS.get(key)
 
-        item["label"] = label
-        item["hint"] = get_kz_hint(item, label)
-
-        localized_fields.append(item)
+        localized_fields.append({
+            **field,
+            "label": kz_label or field.get("label", key),
+            "hint": kz_label or field.get("hint", key),
+        })
 
     return localized_fields
 
 
 def localize_document_types(document_types: dict, language: str = "ru") -> dict:
-    """
-    Optional helper if you need the whole DOCUMENT_TYPES dict localized.
-    Usually for AI matching use get_localized_documents(), and for selected
-    document fields use get_localized_fields().
-    """
+
     if not is_kazakh_language(language):
         return document_types
 
