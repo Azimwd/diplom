@@ -502,7 +502,7 @@ from chats.models import ChatSession, ChatMessage
 from subscriptions.services.usage_limits import consume_user_token
 
 
-def handle_ai_question_from_telegram(tg_profile, question):
+def handle_ai_question_from_telegram(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
 
@@ -570,7 +570,7 @@ def get_or_create_telegram_session(tg_profile):
     return session
 
 
-def handle_price_question(tg_profile, question):
+def handle_price_question(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
@@ -620,7 +620,7 @@ def handle_price_question(tg_profile, question):
             "message": "Ошибка при расчёте стоимости дела."
         }
 
-def handle_win_chance_question(tg_profile, question):
+def handle_win_chance_question(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
@@ -716,7 +716,7 @@ def handle_telegram_document_select(tg_profile, document_query):
     return response_data
 
 
-def handle_telegram_document_generate(tg_profile, raw_json):
+def handle_telegram_document_generate(tg_profile, raw_json, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
@@ -814,7 +814,7 @@ def handle_telegram_document_generate(tg_profile, raw_json):
             "message": "Ошибка при создании документа."
         }
 
-def handle_top_lawyers_question(tg_profile, question):
+def handle_top_lawyers_question(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
