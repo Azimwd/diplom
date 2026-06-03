@@ -206,7 +206,49 @@ class SocialCompleteView(APIView):
         )
 
         return response
-    
+def set_auth_cookies(response, request, user):
+    refresh = RefreshToken.for_user(user)
+
+    cookie_options = {
+        "secure": True,
+        "samesite": "None",
+        "path": "/",
+    }
+
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=str(refresh.access_token),
+        httponly=True,
+        max_age=ACCESS_MAX_AGE,
+        **cookie_options,
+    )
+
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=str(refresh),
+        httponly=True,
+        max_age=REFRESH_MAX_AGE,
+        **cookie_options,
+    )
+
+    response.set_cookie(
+        key=SESSION_FLAG_COOKIE,
+        value="1",
+        httponly=False,
+        **cookie_options,
+    )
+
+    csrf_token = get_token(request)
+
+    response.set_cookie(
+        key="csrftoken",
+        value=csrf_token,
+        httponly=False,
+        **cookie_options,
+    )
+
+    return response
+
 def google_callback_view(request):
     code = request.GET.get("code")
     if not code:
@@ -255,22 +297,23 @@ def google_callback_view(request):
         )
 
     refresh = RefreshToken.for_user(user)
-    response = redirect("http://localhost:5173")
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+    response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
 
     response.set_cookie(
-        ACCESS_COOKIE_NAME,
-        str(refresh.access_token),
+        key=ACCESS_COOKIE_NAME,
+        value=access_token,
         httponly=COOKIE_HTTPONLY,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
         max_age=ACCESS_MAX_AGE,
         path="/",
         domain=COOKIE_DOMAIN,
-    )
-
+        )
     response.set_cookie(
-        REFRESH_COOKIE_NAME,
-        str(refresh),
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
         httponly=COOKIE_HTTPONLY,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
@@ -278,17 +321,15 @@ def google_callback_view(request):
         path="/",
         domain=COOKIE_DOMAIN,
     )
-
     response.set_cookie(
-        SESSION_FLAG_COOKIE,
-        "1",
+        key=SESSION_FLAG_COOKIE,
+        value="1",
         httponly=False,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
         path="/",
         domain=COOKIE_DOMAIN,
     )
-
     csrf_token = get_token(request)
     response.set_cookie(
         key="csrftoken",
