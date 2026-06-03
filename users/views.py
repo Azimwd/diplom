@@ -249,6 +249,51 @@ def set_auth_cookies(response, request, user):
 
     return response
 
+def set_auth_cookies(response, request, access_token, refresh_token):
+    cookie_params = {
+        "secure": COOKIE_SECURE,
+        "samesite": COOKIE_SAMESITE,
+        "path": "/",
+    }
+
+    # Важно: если COOKIE_DOMAIN пустой, не передаем domain вообще
+    if COOKIE_DOMAIN:
+        cookie_params["domain"] = COOKIE_DOMAIN
+
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=access_token,
+        httponly=COOKIE_HTTPONLY,
+        max_age=ACCESS_MAX_AGE,
+        **cookie_params,
+    )
+
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=COOKIE_HTTPONLY,
+        max_age=REFRESH_MAX_AGE,
+        **cookie_params,
+    )
+
+    response.set_cookie(
+        key=SESSION_FLAG_COOKIE,
+        value="1",
+        httponly=False,
+        **cookie_params,
+    )
+
+    csrf_token = get_token(request)
+
+    response.set_cookie(
+        key="csrftoken",
+        value=csrf_token,
+        httponly=False,
+        **cookie_params,
+    )
+
+    return response
+
 def google_callback_view(request):
     code = request.GET.get("code")
     if not code:
@@ -290,55 +335,37 @@ def google_callback_view(request):
     profile.email = user.email
     profile.save()
 
-    if created or not getattr(user, "role", None):
-        s = SocialOnboardingSession.create(user=user, provider="google", ttl_minutes=10)
-        return redirect(
-            f"https://lawly.up.railway.app/auth/choose-role?social_session={s.session_id}"
-        )
-
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
+
+    if created or not getattr(user, "role", None):
+        s = SocialOnboardingSession.create(
+            user=user,
+            provider="google",
+            ttl_minutes=10,
+        )
+
+        response = redirect(
+            f"https://diplomfrontendlawly-production.up.railway.app/auth/choose-role?social_session={s.session_id}"
+        )
+
+        response = set_auth_cookies(
+            response=response,
+            request=request,
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+
+        return response
+
     response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
 
-    response.set_cookie(
-        key=ACCESS_COOKIE_NAME,
-        value=access_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=ACCESS_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-        )
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=refresh_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=REFRESH_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-    )
-    response.set_cookie(
-        key=SESSION_FLAG_COOKIE,
-        value="1",
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-    )
-    csrf_token = get_token(request)
-    response.set_cookie(
-        key="csrftoken",
-        value=csrf_token,
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
+    response = set_auth_cookies(
+        response=response,
+        request=request,
+        access_token=access_token,
+        refresh_token=refresh_token,
     )
 
     return response
