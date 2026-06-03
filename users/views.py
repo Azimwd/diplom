@@ -25,7 +25,7 @@ ACCESS_COOKIE_NAME = "access_token"
 REFRESH_COOKIE_NAME = "refresh_token"
 SESSION_FLAG_COOKIE = "has_session"
 
-ACCESS_MAX_AGE = 15 * 60
+ACCESS_MAX_AGE = 1
 REFRESH_MAX_AGE = 30 * 24 * 60 * 60
 
 COOKIE_SECURE = True
@@ -840,7 +840,7 @@ def set_auth_cookies(response, request, access_token, refresh_token):
         httponly=True,
         secure=cookie_params["secure"],
         samesite=cookie_params["samesite"],
-        max_age=60 * 15,
+        max_age=60 * 2,
         path=cookie_params["path"],
         domain=cookie_params.get("domain"),
     )
