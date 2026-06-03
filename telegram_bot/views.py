@@ -26,11 +26,26 @@ from payments.services import (
     get_subscription_plans_for_response,
     SUBSCRIPTION_PLANS,
 )
-
 def json_to_telegram_text(data):
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
+SUPPORTED_LANGUAGES = {"en", "ru", "kk"}
+DEFAULT_LANGUAGE = "en"
+
+
+def normalize_telegram_language(language_code):
+    if not language_code:
+        return DEFAULT_LANGUAGE
+
+    language = str(language_code).lower().strip()
+
+    language = language.replace("_", "-").split("-")[0]
+
+    if language in SUPPORTED_LANGUAGES:
+        return language
+
+    return DEFAULT_LANGUAGE
 
 @method_decorator(csrf_exempt, name="dispatch")
 class TelegramWebhookView(APIView):
@@ -67,7 +82,9 @@ class TelegramWebhookView(APIView):
         telegram_id = from_user.get("id")
         username = from_user.get("username")
         first_name = from_user.get("first_name")
-
+        language = normalize_telegram_language(
+            from_user.get("language_code")
+        )
         if not chat_id or not telegram_id:
             return JsonResponse({"ok": True})
 
@@ -367,7 +384,8 @@ class TelegramWebhookView(APIView):
 
             answer = handle_ai_question_from_telegram(
                 tg_profile=tg_profile,
-                question=question
+                question=question,
+                language=language
             )
 
             return JsonResponse(answer, safe=False)
@@ -382,9 +400,10 @@ class TelegramWebhookView(APIView):
                     "message": "После /price нужно написать вопрос."
                 })
 
-            answer = handle_price_question(
+            answer = handle_win_chance_question(
                 tg_profile=tg_profile,
-                question=question
+                question=question,
+                language=language
             )
 
             return JsonResponse(answer, safe=False)
@@ -401,7 +420,8 @@ class TelegramWebhookView(APIView):
 
             answer = handle_win_chance_question(
                 tg_profile=tg_profile,
-                question=question
+                question=question,
+                language=language
             )
 
             return JsonResponse(answer, safe=False)
@@ -418,7 +438,8 @@ class TelegramWebhookView(APIView):
 
             answer = handle_top_lawyers_question(
                 tg_profile=tg_profile,
-                question=question
+                question=question,
+                language=language
             )
 
             return JsonResponse(answer, safe=False)
@@ -464,7 +485,8 @@ class TelegramWebhookView(APIView):
 
             answer = handle_telegram_document_generate(
                 tg_profile=tg_profile,
-                raw_json=raw_json
+                raw_json=raw_json,
+                language=language
             )
 
             return JsonResponse(answer, safe=False)

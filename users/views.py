@@ -217,7 +217,7 @@ def google_callback_view(request):
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": "https://lawly.up.railway.app/accounts/google/login/callback/",
+        "redirect_uri": "https://lawly.up.railway.app/users/google/callback/",
         "grant_type": "authorization_code",
     }
     r = requests.post(token_url, data=data, timeout=15)
