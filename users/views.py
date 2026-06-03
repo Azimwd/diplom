@@ -1017,16 +1017,13 @@ def google_exchange_view(request):
 
     csrf_token = get_token(request)
 
-    has_role = bool(getattr(user, "role", None))
-
     response = Response(
         {
             "statusCode": 200,
             "success": True,
             "data": {
                 "csrf_token": csrf_token,
-                "has_role": has_role,
-                "redirect": "/chat" if has_role else f"/auth/choose-role?social_session={session_id}",
+                "redirect": "/chat",
             },
             "message": "Google auth completed",
         },
