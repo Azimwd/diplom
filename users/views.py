@@ -614,45 +614,6 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
     authentication_classes = []
 
     def post(self, request):
-        email = request.data.get("email")
-        user = User.objects.filter(email=email).first()
-
-        if user:
-            uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
-            token = PasswordResetTokenGenerator().make_token(user)
-            reset_url = (
-                f"https://diplomfrontendlawly-production.up.railway.app/auth/reset-password-confirm/{uidb64}/{token}/"
-            )
-
-            try:
-                send_password_reset_email(email, reset_url)
-            except requests.RequestException as e:
-                return Response(
-                    {
-                        "statusCode": 500,
-                        "success": False,
-                        "data": None,
-                        "message": f"Ошибка отправки письма: {str(e)}",
-                    },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-        return Response(
-            {
-                "statusCode": 200,
-                "success": True,
-                "data": None,
-                "message": "На вашу почту была отправлена ссылка для восстановления пароля",
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class RequestPasswordResetEmail(generics.GenericAPIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    def post(self, request):
         email = request.data.get("email", "").strip().lower()
 
         print("RESET EMAIL REQUEST:", email)
@@ -714,6 +675,47 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class PasswordTokenCheckAPI(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, uidb64, token):
+        try:
+            user_id = smart_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(id=user_id)
+
+            if not PasswordResetTokenGenerator().check_token(user, token):
+                return Response(
+                    {
+                        "statusCode": 400,
+                        "success": False,
+                        "data": None,
+                        "message": "Ссылка недействительна",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {
+                    "statusCode": 200,
+                    "success": True,
+                    "data": {"uidb64": uidb64, "token": token},
+                    "message": "Пороль проверен",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except DjangoUnicodeDecodeError:
+            return Response(
+                {
+                    "statusCode": 400,
+                    "success": False,
+                    "data": None,
+                    "message": "Ссылка недействительна",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class SetNewPasswordAPIView(generics.GenericAPIView):
