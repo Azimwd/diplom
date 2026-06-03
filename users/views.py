@@ -647,7 +647,7 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
         token = PasswordResetTokenGenerator().make_token(user)
 
         reset_url = (
-            f"https://diplomfrontendlawly-production.up.railway.app/auth/reset-password-confirm/{uidb64}/{token}/"
+            f"https://diplomfrontendlawly-production.up.railway.app/login/forgot-password/{uidb64}/{token}/"
         )
 
         print("RESET URL:", reset_url)
