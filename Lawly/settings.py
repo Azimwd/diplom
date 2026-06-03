@@ -192,13 +192,27 @@ SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "optional"
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        "SCOPE": ["profile", "email"],
+        "APPS": [
+            {
+                "client_id": GOOGLE_CLIENT_ID,
+                "secret": GOOGLE_CLIENT_SECRET,
+                "key": "",
+            }
+        ],
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
         "AUTH_PARAMS": {
-            "access_type": "offline",
+            "access_type": "online",
             "prompt": "select_account",
         },
+        "OAUTH_PKCE_ENABLED": True,
     }
 }
 
@@ -206,9 +220,6 @@ SOCIALACCOUNT_PROVIDERS = {
 # =========================
 # GOOGLE OAUTH
 # =========================
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
 GOOGLE_OAUTH_CALLBACK_URL = os.getenv(
     "GOOGLE_OAUTH_CALLBACK_URL",
