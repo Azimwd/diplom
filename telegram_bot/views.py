@@ -83,7 +83,7 @@ class TelegramWebhookView(APIView):
         username = from_user.get("username")
         first_name = from_user.get("first_name")
         language = normalize_telegram_language(
-            from_user.get("language_code")
+            from_user.get("language_code") or message.get("language")
         )
         if not chat_id or not telegram_id:
             return JsonResponse({"ok": True})
@@ -400,7 +400,7 @@ class TelegramWebhookView(APIView):
                     "message": "После /price нужно написать вопрос."
                 })
 
-            answer = handle_win_chance_question(
+            answer = handle_price_question(
                 tg_profile=tg_profile,
                 question=question,
                 language=language
@@ -524,14 +524,13 @@ def handle_ai_question_from_telegram(tg_profile, question, language=DEFAULT_LANG
             content=question
         )
 
-        payload = {
-            "question": question,
-            "session_id": session.id
-        }
-
         r = requests.post(
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/ask",
-            json=payload,
+            json={
+                "question": question,
+                "session_id": session.id,
+                "language": normalize_telegram_language(language)
+            },
             timeout=120,
         )
 
@@ -574,6 +573,7 @@ def handle_price_question(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
+        language = normalize_telegram_language(language)
 
         limit_response = consume_user_token(user)
 
@@ -594,7 +594,8 @@ def handle_price_question(tg_profile, question, language=DEFAULT_LANGUAGE):
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/price",
             json={
                 "question": question,
-                "session_id": session.id
+                "session_id": session.id,
+                "language": language
             },
             timeout=120,
         )
@@ -624,6 +625,7 @@ def handle_win_chance_question(tg_profile, question, language=DEFAULT_LANGUAGE):
     try:
         session = get_or_create_telegram_session(tg_profile)
         user = tg_profile.user
+        language = normalize_telegram_language(language)
 
         limit_response = consume_user_token(user)
 
@@ -644,7 +646,8 @@ def handle_win_chance_question(tg_profile, question, language=DEFAULT_LANGUAGE):
             "https://etha-hypercatalectic-rueben.ngrok-free.dev/article-win-chance",
             json={
                 "question": question,
-                "session_id": session.id
+                "session_id": session.id,
+                "language": language
             },
             timeout=120,
         )
@@ -784,9 +787,12 @@ def handle_telegram_document_generate(tg_profile, raw_json, language=DEFAULT_LAN
             content=f"Создание документа: {template_name}"
         )
 
+        language = normalize_telegram_language(language)
+
         generator_response = send_to_generator(
             template_name=template_name,
-            values=values
+            values=values,
+            language=language
         )
 
         if generator_response.get("error"):
@@ -839,7 +845,8 @@ def handle_top_lawyers_question(tg_profile, question, language=DEFAULT_LANGUAGE)
             json={
                 "question": question,
                 "top_n": 5,
-                "session_id": session.id
+                "session_id": session.id,
+                "language": normalize_telegram_language(language)
             },
             timeout=120,
         )
