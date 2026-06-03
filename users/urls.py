@@ -13,5 +13,5 @@ urlpatterns = [
     path('password-reset/<uidb64>/<token>/', PasswordTokenCheckAPI.as_view(), name='password-reset-confirm'),
     path('password-reset-complete/', SetNewPasswordAPIView.as_view(), name='password-reset-complete'),
 
-    path("google/callback/", google_callback_view, name="google-callback"),
+    path('accounts/google/login/callback/', google_callback_view, name='google_token_callback'),
 ]
