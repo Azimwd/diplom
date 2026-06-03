@@ -845,7 +845,7 @@ from django.middleware.csrf import get_token
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import User
+
 from user_profile.models import Profile
 from users.models import SocialOnboardingSession
 
