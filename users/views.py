@@ -25,7 +25,7 @@ ACCESS_COOKIE_NAME = "access_token"
 REFRESH_COOKIE_NAME = "refresh_token"
 SESSION_FLAG_COOKIE = "has_session"
 
-ACCESS_MAX_AGE = 2
+ACCESS_MAX_AGE = 60 * 2
 REFRESH_MAX_AGE = 30 * 24 * 60 * 60
 
 COOKIE_SECURE = True
@@ -224,99 +224,99 @@ def google_login_view(request):
 
     return redirect(f"{google_url}?{urllib.parse.urlencode(params)}")
 
-def google_callback_view(request):
-    code = request.GET.get("code")
-    if not code:
-        return JsonResponse({"error": "No code"}, status=400)
+# def google_callback_view(request):
+#     code = request.GET.get("code")
+#     if not code:
+#         return JsonResponse({"error": "No code"}, status=400)
 
-    token_url = "https://oauth2.googleapis.com/token"
-    data = {
-        "code": code,
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": "https://lawly.up.railway.app/users/google/callback/",
-        "grant_type": "authorization_code",
-    }
-    r = requests.post(token_url, data=data, timeout=15)
-    tokens = r.json()
-    if "error" in tokens:
-        return JsonResponse(tokens, status=400)
+#     token_url = "https://oauth2.googleapis.com/token"
+#     data = {
+#         "code": code,
+#         "client_id": settings.GOOGLE_CLIENT_ID,
+#         "client_secret": settings.GOOGLE_CLIENT_SECRET,
+#         "redirect_uri": "https://lawly.up.railway.app/users/google/callback/",
+#         "grant_type": "authorization_code",
+#     }
+#     r = requests.post(token_url, data=data, timeout=15)
+#     tokens = r.json()
+#     if "error" in tokens:
+#         return JsonResponse(tokens, status=400)
 
-    userinfo = requests.get(
-        "https://www.googleapis.com/oauth2/v2/userinfo",
-        headers={"Authorization": f"Bearer {tokens['access_token']}"} ,
-        timeout=15,
-    ).json()
+#     userinfo = requests.get(
+#         "https://www.googleapis.com/oauth2/v2/userinfo",
+#         headers={"Authorization": f"Bearer {tokens['access_token']}"} ,
+#         timeout=15,
+#     ).json()
 
-    email = userinfo.get("email")
-    if not email:
-        return JsonResponse({"error": "No email"}, status=400)
+#     email = userinfo.get("email")
+#     if not email:
+#         return JsonResponse({"error": "No email"}, status=400)
 
-    user, created = User.objects.get_or_create(email=email)
+#     user, created = User.objects.get_or_create(email=email)
 
-    # обнови имена (если есть)
-    user.first_name = userinfo.get("given_name", user.first_name or "")
-    user.last_name = userinfo.get("family_name", user.last_name or "")
-    user.save(update_fields=["first_name", "last_name"])
+#     # обнови имена (если есть)
+#     user.first_name = userinfo.get("given_name", user.first_name or "")
+#     user.last_name = userinfo.get("family_name", user.last_name or "")
+#     user.save(update_fields=["first_name", "last_name"])
 
-    profile, _ = Profile.objects.get_or_create(user=user)
-    profile.first_name = user.first_name
-    profile.last_name = user.last_name
-    profile.email = user.email
-    profile.save()
+#     profile, _ = Profile.objects.get_or_create(user=user)
+#     profile.first_name = user.first_name
+#     profile.last_name = user.last_name
+#     profile.email = user.email
+#     profile.save()
 
-    if created or not getattr(user, "role", None):
-        s = SocialOnboardingSession.create(user=user, provider="google", ttl_minutes=10)
-        return redirect(
-            f"https://lawly.up.railway.app/auth/choose-role?social_session={s.session_id}"
-        )
+#     if created or not getattr(user, "role", None):
+#         s = SocialOnboardingSession.create(user=user, provider="google", ttl_minutes=10)
+#         return redirect(
+#             f"https://lawly.up.railway.app/auth/choose-role?social_session={s.session_id}"
+#         )
 
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
-    refresh_token = str(refresh)
-    response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
+#     refresh = RefreshToken.for_user(user)
+#     access_token = str(refresh.access_token)
+#     refresh_token = str(refresh)
+#     response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
 
-    response.set_cookie(
-        key=ACCESS_COOKIE_NAME,
-        value=access_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=ACCESS_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-        )
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=refresh_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=REFRESH_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-    )
-    response.set_cookie(
-        key=SESSION_FLAG_COOKIE,
-        value="1",
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-    )
-    csrf_token = get_token(request)
-    response.set_cookie(
-        key="csrftoken",
-        value=csrf_token,
-        httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-    )
+#     response.set_cookie(
+#         key=ACCESS_COOKIE_NAME,
+#         value=access_token,
+#         httponly=COOKIE_HTTPONLY,
+#         secure=COOKIE_SECURE,
+#         samesite=COOKIE_SAMESITE,
+#         max_age=ACCESS_MAX_AGE,
+#         path="/",
+#         domain=COOKIE_DOMAIN,
+#         )
+#     response.set_cookie(
+#         key=REFRESH_COOKIE_NAME,
+#         value=refresh_token,
+#         httponly=COOKIE_HTTPONLY,
+#         secure=COOKIE_SECURE,
+#         samesite=COOKIE_SAMESITE,
+#         max_age=REFRESH_MAX_AGE,
+#         path="/",
+#         domain=COOKIE_DOMAIN,
+#     )
+#     response.set_cookie(
+#         key=SESSION_FLAG_COOKIE,
+#         value="1",
+#         httponly=False,
+#         secure=COOKIE_SECURE,
+#         samesite=COOKIE_SAMESITE,
+#         path="/",
+#         domain=COOKIE_DOMAIN,
+#     )
+#     csrf_token = get_token(request)
+#     response.set_cookie(
+#         key="csrftoken",
+#         value=csrf_token,
+#         httponly=False,
+#         secure=COOKIE_SECURE,
+#         samesite=COOKIE_SAMESITE,
+#         path="/",
+#         domain=COOKIE_DOMAIN,
+#     )
 
-    return response
+#     return response
 
 class Registrations(APIView):
     permission_classes = [AllowAny]
@@ -939,7 +939,15 @@ def google_callback_view(request):
     if not email:
         return JsonResponse({"error": "No email"}, status=400)
 
-    user, created = User.objects.get_or_create(email=email)
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            "first_name": userinfo.get("given_name", ""),
+            "last_name": userinfo.get("family_name", ""),
+            "agreementAccepted": True,
+            "privacyPolicyAccepted": True,
+        },
+    )
 
     user.first_name = userinfo.get("given_name", user.first_name or "")
     user.last_name = userinfo.get("family_name", user.last_name or "")
