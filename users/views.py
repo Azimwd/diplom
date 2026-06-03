@@ -1,282 +1,3 @@
-# import requests
-# from rest_framework.views import APIView, Response
-# from users.serializers import *
-# from rest_framework.permissions import IsAuthenticated
-# from rest_framework_simplejwt.tokens import RefreshToken, TokenError
-# from rest_framework.permissions import AllowAny
-# from django.http import JsonResponse
-# from django.shortcuts import redirect
-# from rest_framework import generics, status
-# from django.contrib.auth.tokens import PasswordResetTokenGenerator
-# from django.utils.encoding import smart_bytes, smart_str, DjangoUnicodeDecodeError
-# from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-# from django.core.mail import send_mail
-# from django.conf import settings
-# from django.contrib.auth import get_user_model
-# from django.core.exceptions import ObjectDoesNotExist
-# from django.middleware.csrf import get_token
-# from django.views.decorators.csrf import ensure_csrf_cookie
-# from django.utils.decorators import method_decorator
-# from django.views.decorators.csrf import csrf_exempt
-
-# ACCESS_COOKIE_NAME = "access_token"
-# REFRESH_COOKIE_NAME = "refresh_token"
-# ACCESS_MAX_AGE = 7*24*60*60
-# REFRESH_MAX_AGE = 7*24*60*60
-# COOKIE_SECURE = False
-# COOKIE_HTTPONLY = False
-# COOKIE_SAMESITE = "Lax"
-
-# User = get_user_model()
-
-# @ensure_csrf_cookie
-# def csrf_token_view(request):
-#     return JsonResponse({'csrf_token': get_token(request)})
-
-# class Registrations(APIView):
-#     permission_classes = [AllowAny]
-#     def post(self, request):
-#         serializer = RegisterSerializer(data=request.data)
-
-#         if serializer.is_valid():
-#             user = serializer.save()
-
-#             return Response({
-#                  "user_id": user.id,
-#                 "message": "Регистрация завершена"
-#             }, status=status.HTTP_201_CREATED)
-        
-#         errors = serializer.errors
-
-#         def get_first_error(errs):
-#             if isinstance(errs, list) and errs:
-#                 return str(errs[0])
-#             elif isinstance(errs, dict) and errs:
-#                 return get_first_error(next(iter(errs.values())))
-#             return None
-
-#         first_error = get_first_error(errors)
-
-#         return Response({
-#             "message": first_error or "Ошибка валидации"
-#         }, status=status.HTTP_400_BAD_REQUEST)
-    
-
-# class LoginView(APIView):
-#     permission_classes = [AllowAny]
-
-#     def post(self, request):
-#         serializer = LoginSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-
-#         user = serializer.validated_data['user']
-
-#         refresh = RefreshToken.for_user(user)
-#         access_token = str(refresh.access_token)
-#         refresh_token = str(refresh)
-
-#         response = Response({
-#             "id": user.id,
-#             "email": user.email,
-#             "role": getattr(user, "role", None),
-#             "csrf_token": get_token(request),
-#             "message": "Успешный вход"
-#         }, status=status.HTTP_200_OK)
-
-#         response.set_cookie(
-#             key=ACCESS_COOKIE_NAME,
-#             value=access_token,
-#             httponly=COOKIE_HTTPONLY,
-#             secure=COOKIE_SECURE,
-#             samesite=COOKIE_SAMESITE,
-#             max_age=ACCESS_MAX_AGE,
-#         )
-#         response.set_cookie(
-#             key=REFRESH_COOKIE_NAME,
-#             value=refresh_token,
-#             httponly=COOKIE_HTTPONLY,
-#             secure=COOKIE_SECURE,
-#             samesite=COOKIE_SAMESITE,
-#             max_age=REFRESH_MAX_AGE,
-#         )
-
-#         return response
-
-
-# class LogoutView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
-
-#         response = Response({
-#             "message": "Успешный выход"
-#         }, status=status.HTTP_200_OK)
-
-#         if refresh_token:
-#             try:
-#                 token = RefreshToken(refresh_token)
-#                 token.blacklist()
-#             except TokenError:
-#                 pass
-
-#         response.delete_cookie(ACCESS_COOKIE_NAME)
-#         response.delete_cookie(REFRESH_COOKIE_NAME)
-
-#         if request.user.socialaccount_set.filter(provider="google").exists():
-#             google_logout_url = (
-#                 "https://accounts.google.com/Logout?continue="
-#                 "https://appengine.google.com/_ah/logout?continue=http://localhost:3000/"
-#             )
-#             return redirect(google_logout_url)
-
-#         return response
-        
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class TokenRefreshView(APIView):
-#     permission_classes = [AllowAny]
-#     authentication_classes = []
-#     def post(self, request):
-#         refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
-#         if not refresh_token:
-#             return Response({
-#                 "message": "Отсутствует refresh token"
-#             }, status=status.HTTP_401_UNAUTHORIZED)
-
-#         try:
-#             refresh = RefreshToken(refresh_token)
-#         except TokenError:
-#             return Response({
-#                 "message": "Refresh token недействителен или просрочен"
-#             }, status=status.HTTP_401_UNAUTHORIZED)
-
-#         user_id = refresh.get("user_id")
-#         try:
-#             user = User.objects.get(id=user_id)
-#         except ObjectDoesNotExist:
-#             return Response({
-#                 "message": "Пользователь не найден"
-#             }, status=status.HTTP_401_UNAUTHORIZED)
-
-#         try:
-#             refresh.blacklist()
-#         except (AttributeError, TokenError):
-#             pass
-
-#         new_refresh = RefreshToken.for_user(user)
-#         new_access = str(new_refresh.access_token)
-#         new_refresh_token = str(new_refresh)
-
-#         response = Response({
-#             "message": "Access token обновлён",
-#         }, status=status.HTTP_200_OK)
-
-#         response.set_cookie(
-#             key=ACCESS_COOKIE_NAME,
-#             value=new_access,
-#             httponly=COOKIE_HTTPONLY,
-#             secure=COOKIE_SECURE,
-#             samesite=COOKIE_SAMESITE,
-#             max_age=ACCESS_MAX_AGE,
-#         )
-#         response.set_cookie(
-#             key=REFRESH_COOKIE_NAME,
-#             value=new_refresh_token,
-#             httponly=COOKIE_HTTPONLY,
-#             secure=COOKIE_SECURE,
-#             samesite=COOKIE_SAMESITE,
-#             max_age=REFRESH_MAX_AGE,
-#         )
-
-#         return response
-
-
-# class UserInfoView(APIView):
-#     permission_classes = [IsAuthenticated]
-#     def get(self, request):
-       
-#         user = request.user
-#         response = Response({
-#             "id": user.id,
-#             "email": user.email,
-#             "role": user.role,
-#             "message": "Успешный вход"
-#         }, status=status.HTTP_200_OK)
-
-#         return response
-
-
-# class RequestPasswordResetEmail(generics.GenericAPIView):
-#     permission_classes = [AllowAny]
-#     def post(self, request):
-#         email = request.data.get('email')
-#         user = User.objects.filter(email=email).first()
-#         if user:
-#             uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
-#             token = PasswordResetTokenGenerator().make_token(user)
-#             reset_url = f"http://localhost:8000/auth/reset-password-confirm/{uidb64}/{token}/"
-#             send_mail(
-#                 subject="Сброс пароля",
-#                 message=f"Перейдите по ссылке, чтобы сбросить пароль: {reset_url}",
-#                 from_email=settings.DEFAULT_FROM_EMAIL,
-#                 recipient_list=[email],
-#                 fail_silently=False
-#             )
-
-#         return Response({
-#                 "message": "На вашу почту была отправлена ссылка для восстановления пароля",
-#                 "uidb64": uidb64,
-#                 "token": token,
-#                 }, status=status.HTTP_200_OK)
-
-
-# class PasswordTokenCheckAPI(generics.GenericAPIView):
-#     def get(self, request, uidb64, token):
-#         try:
-#             user_id = smart_str(urlsafe_base64_decode(uidb64))
-#             user = User.objects.get(id=user_id)
-
-#             if not PasswordResetTokenGenerator().check_token(user, token):
-#                 return Response({
-#                     "message": "Ссылка недействительна"
-#                     }, status=status.HTTP_400_BAD_REQUEST)
-#             return Response({
-#                     'uidb64': uidb64, 
-#                     'token': token,
-#                     "message": "Пороль проверен"
-#                     }, status=status.HTTP_200_OK)
-        
-#         except DjangoUnicodeDecodeError:
-#             return Response({
-#                     "message": "Ссылка недействительна"
-#                     }, status=status.HTTP_400_BAD_REQUEST)
-
-
-# class SetNewPasswordAPIView(generics.GenericAPIView):
-#     def patch(self, request):
-#         uidb64 = request.data.get('uidb64')
-#         token = request.data.get('token')
-#         password = request.data.get('password')
-
-#         try:
-#             user_id = smart_str(urlsafe_base64_decode(uidb64))
-#             user = User.objects.get(id=user_id)
-
-#             if not PasswordResetTokenGenerator().check_token(user, token):
-#                 return Response({
-#                     "message": "Ссылка недействительна"
-#                     }, status=status.HTTP_400_BAD_REQUEST)
-#             user.set_password(password)
-#             user.save()
-#             return Response({
-#                 "message": "Пароль успешно изменён"
-#                 }, status=status.HTTP_200_OK)
-#         except Exception as e:
-#             return Response({
-#                 "message": f"Что-то пошло не так: {str(e)}"
-#             }, status=status.HTTP_400_BAD_REQUEST)
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from users.serializers import *
@@ -873,72 +594,6 @@ class UserInfoView(APIView):
         return response
 
 
-# class EmailVerifyView(APIView):
-#     permission_classes = [AllowAny]
-#     authentication_classes = []
-
-#     def get(self, request):
-#         token = request.query_params.get("token")
-
-#         try:
-#             session = RegistrationSession.objects.get(email_verification_token=token)
-#         except RegistrationSession.DoesNotExist:
-#             return redirect("https://www.yurgid.kz/verify-email?status=invalid")
-
-#         if session.is_email_verified:
-#             return redirect(
-#                 "https://www.yurgid.kz/verify-email?status=already_verified"
-#             )
-
-#         session.is_email_verified = True
-#         session.save()
-
-#         return redirect("https://www.yurgid.kz/verify-email?status=success")
-
-
-# class ResendVerificationEmailView(APIView):
-#     permission_classes = [AllowAny]
-#     authentication_classes = []
-
-#     def post(self, request):
-#         email = request.data.get("email")
-#         session = RegistrationSession.objects.filter(email=email).first()
-
-#         if not session:
-#             return Response({"message": "Сессия не найдена"}, status=404)
-
-#         if session.is_email_verified:
-#             return Response({"message": "Email уже подтверждён"}, status=400)
-
-#         if session.last_email_sent_at:
-#             if timezone.now() - session.last_email_sent_at < timedelta(seconds=60):
-#                 return Response(
-#                     {"message": "Повторная отправка возможна через минуту"},
-#                     status=429,
-#                 )
-
-#         verification_url = (
-#             f"https://diplom-production-db9e.up.railway.app/api/users/verify-email?"
-#             f"token={session.email_verification_token}"
-#         )
-
-#         try:
-#             resend_verification_email(session.email, verification_url)
-#         except requests.RequestException as e:
-#             return Response(
-#                 {"message": f"Ошибка отправки письма: {str(e)}"},
-#                 status=500,
-#             )
-
-#         session.last_email_sent_at = timezone.now()
-#         session.save(update_fields=["last_email_sent_at"])
-
-#         return Response(
-#             {"success": True, "message": "Письмо отправлено повторно"},
-#             status=200,
-#         )
-
-
 def first_error_message(detail) -> str:
     if isinstance(detail, dict):
         for v in detail.values():
@@ -966,7 +621,7 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
             uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
             token = PasswordResetTokenGenerator().make_token(user)
             reset_url = (
-                f"http://localhost:5173/auth/reset-password-confirm/{uidb64}/{token}/"
+                f"https://diplomfrontendlawly-production.up.railway.app/auth/reset-password-confirm/{uidb64}/{token}/"
             )
 
             try:
@@ -993,45 +648,72 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
         )
 
 
-class PasswordTokenCheckAPI(generics.GenericAPIView):
+class RequestPasswordResetEmail(generics.GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
-    def get(self, request, uidb64, token):
-        try:
-            user_id = smart_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(id=user_id)
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
 
-            if not PasswordResetTokenGenerator().check_token(user, token):
-                return Response(
-                    {
-                        "statusCode": 400,
-                        "success": False,
-                        "data": None,
-                        "message": "Ссылка недействительна",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            return Response(
-                {
-                    "statusCode": 200,
-                    "success": True,
-                    "data": {"uidb64": uidb64, "token": token},
-                    "message": "Пороль проверен",
-                },
-                status=status.HTTP_200_OK,
-            )
+        print("RESET EMAIL REQUEST:", email)
 
-        except DjangoUnicodeDecodeError:
+        if not email:
             return Response(
                 {
                     "statusCode": 400,
                     "success": False,
-                    "data": None,
-                    "message": "Ссылка недействительна",
+                    "message": "Email не передан",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        user = User.objects.filter(email__iexact=email).first()
+
+        if not user:
+            print("USER NOT FOUND:", email)
+
+            # Только для теста. В продакшене лучше не раскрывать, есть ли email в базе.
+            return Response(
+                {
+                    "statusCode": 404,
+                    "success": False,
+                    "message": "Пользователь с таким email не найден",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
+        token = PasswordResetTokenGenerator().make_token(user)
+
+        reset_url = (
+            f"https://diplomfrontendlawly-production.up.railway.app/auth/reset-password-confirm/{uidb64}/{token}/"
+        )
+
+        print("RESET URL:", reset_url)
+
+        try:
+            result = send_password_reset_email(user.email, reset_url)
+            print("RESEND RESULT:", result)
+        except Exception as e:
+            print("EMAIL SEND ERROR:", str(e))
+
+            return Response(
+                {
+                    "statusCode": 500,
+                    "success": False,
+                    "message": f"Ошибка отправки письма: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "statusCode": 200,
+                "success": True,
+                "message": "На вашу почту была отправлена ссылка для восстановления пароля",
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SetNewPasswordAPIView(generics.GenericAPIView):
