@@ -893,13 +893,7 @@ def google_login_view(request):
 
     google_url = "https://accounts.google.com/o/oauth2/v2/auth"
 
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
-    refresh_token = str(refresh)
-
-    response = redirect(f"{settings.FRONTEND_URL.rstrip('/')}/chat")
-
-    return set_auth_cookies(response, request, access_token, refresh_token)
+    return redirect(f"{google_url}?{urllib.parse.urlencode(params)}")
 
 
 def google_callback_view(request):
