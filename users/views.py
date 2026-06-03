@@ -646,14 +646,14 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
         uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
         token = PasswordResetTokenGenerator().make_token(user)
 
-        reset_url = (
-            f"https://diplomfrontendlawly-production.up.railway.app/login/forgot-password/{uidb64}/{token}/"
+        reset_link = (
+            f"{settings.FRONTEND_URL}/login/forgot-password/"
+            f"?uidb64={uidb64}&token={token}"
         )
-
-        print("RESET URL:", reset_url)
+        print("RESET URL:", reset_link)
 
         try:
-            result = send_password_reset_email(user.email, reset_url)
+            result = send_password_reset_email(user.email, reset_link)
             print("RESEND RESULT:", result)
         except Exception as e:
             print("EMAIL SEND ERROR:", str(e))
