@@ -249,6 +249,23 @@ def set_auth_cookies(response, request, user):
 
     return response
 
+import urllib.parse
+def google_login_view(request):
+    redirect_uri = "https://lawly.up.railway.app/users/google/callback/"
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+
+    google_url = "https://accounts.google.com/o/oauth2/v2/auth"
+
+    return redirect(f"{google_url}?{urllib.parse.urlencode(params)}")
+
 def google_callback_view(request):
     code = request.GET.get("code")
     if not code:
@@ -803,3 +820,182 @@ class SetNewPasswordAPIView(generics.GenericAPIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import urllib.parse
+import requests
+
+from django.conf import settings
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.middleware.csrf import get_token
+
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from users.models import User
+from user_profile.models import Profile
+from users.models import SocialOnboardingSession
+
+
+def set_auth_cookies(response, request, access_token, refresh_token):
+    cookie_params = {
+        "secure": True,
+        "samesite": "None",
+        "path": "/",
+    }
+
+    if settings.COOKIE_DOMAIN:
+        cookie_params["domain"] = settings.COOKIE_DOMAIN
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=60 * 15,
+        **cookie_params,
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 7,
+        **cookie_params,
+    )
+
+    response.set_cookie(
+        key="has_session",
+        value="1",
+        httponly=False,
+        **cookie_params,
+    )
+
+    csrf_token = get_token(request)
+
+    response.set_cookie(
+        key="csrftoken",
+        value=csrf_token,
+        httponly=False,
+        **cookie_params,
+    )
+
+    return response
+
+
+def google_login_view(request):
+    redirect_uri = "https://lawly.up.railway.app/users/google/callback/"
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+
+    google_url = "https://accounts.google.com/o/oauth2/v2/auth"
+
+    return redirect(f"{google_url}?{urllib.parse.urlencode(params)}")
+
+
+def google_callback_view(request):
+    code = request.GET.get("code")
+
+    if not code:
+        return JsonResponse({"error": "No code"}, status=400)
+
+    redirect_uri = "https://lawly.up.railway.app/users/google/callback/"
+
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        },
+        timeout=15,
+    )
+
+    tokens = token_response.json()
+
+    if token_response.status_code != 200:
+        return JsonResponse(tokens, status=400)
+
+    google_access_token = tokens.get("access_token")
+
+    if not google_access_token:
+        return JsonResponse({"error": "No Google access token"}, status=400)
+
+    userinfo_response = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {google_access_token}"},
+        timeout=15,
+    )
+
+    userinfo = userinfo_response.json()
+
+    email = userinfo.get("email")
+
+    if not email:
+        return JsonResponse({"error": "No email"}, status=400)
+
+    user, created = User.objects.get_or_create(email=email)
+
+    user.first_name = userinfo.get("given_name", user.first_name or "")
+    user.last_name = userinfo.get("family_name", user.last_name or "")
+    user.save(update_fields=["first_name", "last_name"])
+
+    profile, _ = Profile.objects.get_or_create(user=user)
+    profile.first_name = user.first_name
+    profile.last_name = user.last_name
+    profile.email = user.email
+    profile.save()
+
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+
+    if created or not getattr(user, "role", None):
+        social_session = SocialOnboardingSession.create(
+            user=user,
+            provider="google",
+            ttl_minutes=10,
+        )
+
+        response = redirect(
+            f"{frontend_url}/auth/choose-role?social_session={social_session.session_id}"
+        )
+
+        return set_auth_cookies(
+            response=response,
+            request=request,
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+
+    response = redirect(f"{frontend_url}/chat")
+
+    return set_auth_cookies(
+        response=response,
+        request=request,
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
