@@ -851,49 +851,53 @@ from users.models import SocialOnboardingSession
 
 
 def set_auth_cookies(response, request, access_token, refresh_token):
-    cookie_params = {
-        "secure": True,
-        "samesite": "None",
-        "path": "/",
-    }
-
-    if settings.COOKIE_DOMAIN:
-        cookie_params["domain"] = settings.COOKIE_DOMAIN
+    user, created = User.objects.get_or_create(email=email)
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+    response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
 
     response.set_cookie(
-        key="access_token",
+        key=ACCESS_COOKIE_NAME,
         value=access_token,
-        httponly=True,
-        max_age=60 * 15,
-        **cookie_params,
-    )
-
+        httponly=COOKIE_HTTPONLY,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=ACCESS_MAX_AGE,
+        path="/",
+        domain=COOKIE_DOMAIN,
+        )
     response.set_cookie(
-        key="refresh_token",
+        key=REFRESH_COOKIE_NAME,
         value=refresh_token,
-        httponly=True,
-        max_age=60 * 60 * 24 * 7,
-        **cookie_params,
+        httponly=COOKIE_HTTPONLY,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=REFRESH_MAX_AGE,
+        path="/",
+        domain=COOKIE_DOMAIN,
     )
-
     response.set_cookie(
-        key="has_session",
+        key=SESSION_FLAG_COOKIE,
         value="1",
         httponly=False,
-        **cookie_params,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+        domain=COOKIE_DOMAIN,
     )
-
     csrf_token = get_token(request)
-
     response.set_cookie(
         key="csrftoken",
         value=csrf_token,
         httponly=False,
-        **cookie_params,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+        domain=COOKIE_DOMAIN,
     )
 
     return response
-
 
 def google_login_view(request):
     redirect_uri = "https://lawly.up.railway.app/users/google/callback/"
