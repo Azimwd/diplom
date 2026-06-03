@@ -206,48 +206,6 @@ class SocialCompleteView(APIView):
         )
 
         return response
-def set_auth_cookies(response, request, user):
-    refresh = RefreshToken.for_user(user)
-
-    cookie_options = {
-        "secure": True,
-        "samesite": "None",
-        "path": "/",
-    }
-
-    response.set_cookie(
-        key=ACCESS_COOKIE_NAME,
-        value=str(refresh.access_token),
-        httponly=True,
-        max_age=ACCESS_MAX_AGE,
-        **cookie_options,
-    )
-
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=str(refresh),
-        httponly=True,
-        max_age=REFRESH_MAX_AGE,
-        **cookie_options,
-    )
-
-    response.set_cookie(
-        key=SESSION_FLAG_COOKIE,
-        value="1",
-        httponly=False,
-        **cookie_options,
-    )
-
-    csrf_token = get_token(request)
-
-    response.set_cookie(
-        key="csrftoken",
-        value=csrf_token,
-        httponly=False,
-        **cookie_options,
-    )
-
-    return response
 
 import urllib.parse
 def google_login_view(request):
@@ -482,13 +440,32 @@ class SessionPingView(APIView):
             return resp
 
 
-def clear_auth_cookies(response: HttpResponse) -> HttpResponse:
-    response.delete_cookie(ACCESS_COOKIE_NAME, path="/", domain=COOKIE_DOMAIN)
-    response.delete_cookie(REFRESH_COOKIE_NAME, path="/", domain=COOKIE_DOMAIN)
-    response.delete_cookie(SESSION_FLAG_COOKIE, path="/", domain=COOKIE_DOMAIN)
-    response.delete_cookie("csrftoken", path="/", domain=COOKIE_DOMAIN)
-    return response
+def clear_auth_cookies(response):
+    response.delete_cookie(
+        key=ACCESS_COOKIE_NAME,
+        path="/",
+        samesite="None",
+    )
 
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path="/",
+        samesite="None",
+    )
+
+    response.delete_cookie(
+        key=SESSION_FLAG_COOKIE,
+        path="/",
+        samesite="None",
+    )
+
+    response.delete_cookie(
+        key="csrftoken",
+        path="/",
+        samesite="None",
+    )
+
+    return response
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
@@ -514,21 +491,6 @@ class LogoutView(APIView):
         )
 
         clear_auth_cookies(response)
-
-        try:
-            if (
-                getattr(request.user, "is_authenticated", False)
-                and request.user.socialaccount_set.filter(provider="google").exists()
-            ):
-                google_logout_url = (
-                    "https://accounts.google.com/Logout?continue="
-                    "https://appengine.google.com/_ah/logout?continue=http://localhost:5173"
-                )
-                redirect_response = redirect(google_logout_url)
-                clear_auth_cookies(redirect_response)
-                return redirect_response
-        except Exception:
-            pass
 
         return response
 
@@ -842,62 +804,80 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.middleware.csrf import get_token
+from django.contrib.auth import get_user_model
 
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-
 
 from user_profile.models import Profile
 from users.models import SocialOnboardingSession
 
 
+User = get_user_model()
+
+
 def set_auth_cookies(response, request, access_token, refresh_token):
-    user, created = User.objects.get_or_create(email=email)
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
-    refresh_token = str(refresh)
-    response = redirect("https://diplomfrontendlawly-production.up.railway.app/chat")
+    cookie_params = {
+        "secure": True,
+        "samesite": "None",
+        "path": "/",
+    }
+
+    # ВАЖНО: если COOKIE_DOMAIN пустой, domain вообще не передаем
+    cookie_domain = getattr(settings, "COOKIE_DOMAIN", None)
+
+    if cookie_domain:
+        cookie_params["domain"] = cookie_domain
+
+    csrf_token = get_token(request)
 
     response.set_cookie(
-        key=ACCESS_COOKIE_NAME,
+        key="access_token",
         value=access_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=ACCESS_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
-        )
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=refresh_token,
-        httponly=COOKIE_HTTPONLY,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=REFRESH_MAX_AGE,
-        path="/",
-        domain=COOKIE_DOMAIN,
+        httponly=True,
+        secure=cookie_params["secure"],
+        samesite=cookie_params["samesite"],
+        max_age=60 * 15,
+        path=cookie_params["path"],
+        domain=cookie_params.get("domain"),
     )
+
     response.set_cookie(
-        key=SESSION_FLAG_COOKIE,
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=cookie_params["secure"],
+        samesite=cookie_params["samesite"],
+        max_age=60 * 60 * 24 * 7,
+        path=cookie_params["path"],
+        domain=cookie_params.get("domain"),
+    )
+
+    response.set_cookie(
+        key="has_session",
         value="1",
         httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
+        secure=cookie_params["secure"],
+        samesite=cookie_params["samesite"],
+        path=cookie_params["path"],
+        domain=cookie_params.get("domain"),
     )
-    csrf_token = get_token(request)
+
     response.set_cookie(
         key="csrftoken",
         value=csrf_token,
         httponly=False,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        path="/",
-        domain=COOKIE_DOMAIN,
+        secure=cookie_params["secure"],
+        samesite=cookie_params["samesite"],
+        path=cookie_params["path"],
+        domain=cookie_params.get("domain"),
     )
 
     return response
+
 
 def google_login_view(request):
     redirect_uri = "https://lawly.up.railway.app/users/google/callback/"
@@ -968,34 +948,82 @@ def google_callback_view(request):
     profile, _ = Profile.objects.get_or_create(user=user)
     profile.first_name = user.first_name
     profile.last_name = user.last_name
-    profile.email = user.email
-    profile.save()
+
+    if hasattr(profile, "email"):
+        profile.email = user.email
+        profile.save()
+    else:
+        profile.save(update_fields=["first_name", "last_name"])
+
+    social_session = SocialOnboardingSession.create(
+        user=user,
+        provider="google",
+        ttl_minutes=10,
+    )
+
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+
+    return redirect(
+        f"{frontend_url}/auth/google/callback?social_session={social_session.session_id}"
+    )
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def google_exchange_view(request):
+    session_id = request.data.get("social_session")
+
+    if not session_id:
+        return Response(
+            {
+                "statusCode": 400,
+                "success": False,
+                "data": None,
+                "message": "social_session is required",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        social_session = SocialOnboardingSession.objects.get(
+            session_id=session_id,
+            provider="google",
+        )
+    except SocialOnboardingSession.DoesNotExist:
+        return Response(
+            {
+                "statusCode": 400,
+                "success": False,
+                "data": None,
+                "message": "Invalid social session",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = social_session.user
 
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
 
-    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    csrf_token = get_token(request)
 
-    if created or not getattr(user, "role", None):
-        social_session = SocialOnboardingSession.create(
-            user=user,
-            provider="google",
-            ttl_minutes=10,
-        )
+    has_role = bool(getattr(user, "role", None))
 
-        response = redirect(
-            f"{frontend_url}/auth/choose-role?social_session={social_session.session_id}"
-        )
-
-        return set_auth_cookies(
-            response=response,
-            request=request,
-            access_token=access_token,
-            refresh_token=refresh_token,
-        )
-
-    response = redirect(f"{frontend_url}/chat")
+    response = Response(
+        {
+            "statusCode": 200,
+            "success": True,
+            "data": {
+                "csrf_token": csrf_token,
+                "has_role": has_role,
+                "redirect": "/chat" if has_role else f"/auth/choose-role?social_session={session_id}",
+            },
+            "message": "Google auth completed",
+        },
+        status=status.HTTP_200_OK,
+    )
 
     return set_auth_cookies(
         response=response,

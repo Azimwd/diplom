@@ -15,4 +15,5 @@ urlpatterns = [
 
     path("google/login/", google_login_view, name="google-login"),
     path("google/callback/", google_callback_view, name="google-callback"),
+    path("google/exchange/", google_exchange_view, name="google-exchange"),
 ]
